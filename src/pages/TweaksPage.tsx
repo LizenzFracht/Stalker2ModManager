@@ -46,11 +46,12 @@ const CATALOG: { title: string; items: Def[] }[] = [
 const known = new Set(CATALOG.flatMap((c) => c.items.map((i) => i.key.toLowerCase())));
 
 export function TweaksPage() {
-  const { run, toast } = useStore();
+  const { state, run, toast, refresh } = useStore();
   const [tw, setTw] = useState<TweakState | null>(null);
   const [draft, setDraft] = useState<Record<string, string | null>>({});
   const [custom, setCustom] = useState<{ key: string; value: string }[]>([]);
   const [importing, setImporting] = useState(false);
+  const [protectionBusy, setProtectionBusy] = useState(false);
 
   const load = (ts: TweakState) => {
     setTw(ts);
@@ -88,7 +89,7 @@ export function TweaksPage() {
   }, [draft, custom, tw]);
   const dirty = Object.keys(changes).length > 0;
 
-  if (!tw) return <p className="p-8 text-sm text-muted">{t("Lade Engine.ini …")}</p>;
+  if (!tw || !state) return <p className="p-8 text-sm text-muted">{t("Lade Engine.ini …")}</p>;
 
   const save = async () => {
     const ts = await run(() => api.setTweaks(changes), { success: t("Engine.ini gespeichert – wirkt beim nächsten Spielstart.") });
@@ -106,7 +107,35 @@ export function TweaksPage() {
             </p>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel px-3.5 py-2.5 text-xs">
+        <div className="mt-5 flex items-center gap-4 rounded-md border border-line bg-panel px-4 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium">{t("Engine.ini vor Überschreiben schützen")}</div>
+            <p className="mt-1 text-xs leading-relaxed text-muted">{t("Schützt die Datei nach dem Speichern, damit das Spiel deine Tweaks beim Beenden nicht überschreibt. S2MM kann sie weiterhin bearbeiten.")}</p>
+          </div>
+          <Toggle
+            label={t("Engine.ini vor Überschreiben schützen")}
+            checked={state.settings.protectEngineIni}
+            disabled={protectionBusy}
+            onChange={async (protect) => {
+              setProtectionBusy(true);
+              try {
+                const ts = await run(() => api.setEngineIniProtection(protect));
+                if (ts) {
+                  setTw(ts); // keep draft/custom edits intact when only protection changes
+                } else {
+                  // Permissions may have changed before persistence failed. Reconcile
+                  // actual file state without hiding the error or discarding edits.
+                  const actual = await run(() => api.getTweaks());
+                  if (actual) setTw(actual);
+                }
+                await refresh();
+              } finally {
+                setProtectionBusy(false);
+              }
+            }}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel px-3.5 py-2.5 text-xs">
           <span className="min-w-0 flex-1 truncate font-mono text-muted" title={tw.configDir ?? ""}>{tw.configDir ?? "Konfigurationsordner unbekannt"}</span>
           {!tw.engineIniExists && <Badge tone="accent">{t("Engine.ini wird neu angelegt")}</Badge>}
           {tw.readOnly && <Badge tone="info">{t("schreibgeschützt")}</Badge>}

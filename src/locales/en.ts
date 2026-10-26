@@ -1,5 +1,11 @@
 // English UI strings. Keys are the German source texts used in the components.
 export const en: Record<string, string> = {
+  "Engine.ini vor Überschreiben schützen": "Protect Engine.ini from being overwritten",
+  "Schützt die Datei nach dem Speichern, damit das Spiel deine Tweaks beim Beenden nicht überschreibt. S2MM kann sie weiterhin bearbeiten.": "Makes the file read-only after saving so the game cannot overwrite your tweaks on exit. S2MM can still edit it.",
+  "UE4SS konnte beim letzten Spielstart nicht starten.": "UE4SS failed to start on the last game launch.",
+  "Ohne funktionierendes UE4SS laufen keine Lua-Mods und keine Live-Positionsdaten. Prüfe eine zur Spielversion passende UE4SS-Version und die Stalker-2-Konfiguration.": "Lua mods and live position tracking require working UE4SS. Check for a UE4SS build compatible with your game version and the Stalker 2 game configuration.",
+  "Manuell installiert gefunden.": "Found a manual installation.",
+  "Bitte prüfen": "Please review",
   "%LOCALAPPDATA%\\S2MM\\live.json": "%LOCALAPPDATA%\\S2MM\\live.json",
   "), Hotkeys in Konfigurationsdateien und Tasten aus dem Mod Configuration Menu. Änderungen werden direkt in die Datei der Mod geschrieben.":
     "), hotkeys in config files and keys from the Mod Configuration Menu. Changes are written straight into the mod's file.",

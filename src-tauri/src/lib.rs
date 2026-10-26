@@ -14,6 +14,7 @@ mod livemap;
 mod model;
 mod nexus;
 mod pak;
+mod persistence;
 mod plan;
 mod tweaks;
 mod ue4ss;
@@ -64,6 +65,7 @@ pub struct Core {
     deployment: Deployment,
     cache: PakCache,
     nexus_user: Option<NexusUser>,
+    recovery_warnings: Vec<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -140,7 +142,29 @@ impl AppCore {
 
 impl Core {
     fn save(&self) -> Result<()> {
-        write_json(&self.paths.state, &self.db)
+        persistence::save(&self.paths.data, &self.db)
+    }
+
+    fn refresh_live_map(&mut self) -> Result<()> {
+        let Some(id) = self.tool_mod(self.db.settings.livemap_mod_id.as_ref(), "s2mm live-map").mod_id else { return Ok(()) };
+        let Some(entry) = self.db.find_mod(&id) else { return Ok(()) };
+        if entry.author.as_deref() != Some("S2MM") {
+            return Ok(());
+        }
+        // Inspect the game first so Linux resolves LOCALAPPDATA inside its Proton prefix.
+        let _ = self.game();
+        std::fs::create_dir_all(livemap::live_dir())?;
+        if livemap::refresh_library_script(&plan::mod_files_dir(&self.paths.mods, &id))? {
+            if let Some(entry) = self.db.find_mod_mut(&id) {
+                entry.updated_at = now();
+                entry.version = Some(env!("CARGO_PKG_VERSION").into());
+            }
+            self.recovery_warnings.push(tr!(
+                "Live-Map-Mod aktualisiert. Spiel schließen, „Anwenden“ klicken und das Spiel neu starten.",
+                "Live map mod updated. Close the game, click Apply, then restart the game."
+            ));
+        }
+        Ok(())
     }
 
     fn game(&self) -> Option<GameInfo> {
@@ -208,6 +232,7 @@ impl Core {
             app_version: env!("CARGO_PKG_VERSION").into(),
             conflict_errors: conflicts.errors.len(),
             tools: self.tools(),
+            recovery_warnings: self.recovery_warnings.clone(),
         }
     }
 
@@ -292,6 +317,7 @@ struct StateView {
     app_version: String,
     conflict_errors: usize,
     tools: ToolsView,
+    recovery_warnings: Vec<String>,
 }
 
 async fn with_core<T: Send + 'static>(app: &AppCore, f: impl FnOnce(&mut Core) -> Result<T> + Send + 'static) -> Res<T> {
@@ -897,10 +923,10 @@ async fn set_tweaks(core: State<'_, AppCore>, changes: BTreeMap<String, Option<S
 #[tauri::command]
 async fn set_engine_ini_protection(core: State<'_, AppCore>, protect: bool) -> Res<tweaks::TweakState> {
     with_core(&core, move |c| {
-        c.db.settings.protect_engine_ini = protect;
-        c.save()?;
         let dir = config_dir(c).ok_or_else(|| anyhow!(tr!("Konfigurationsordner unbekannt", "Config folder unknown")))?;
         tweaks::set_readonly(&dir.join("Engine.ini"), protect)?;
+        c.db.settings.protect_engine_ini = protect;
+        c.save()?;
         Ok(tweaks::read(Some(&dir)))
     })
     .await
@@ -1336,6 +1362,7 @@ struct LiveStatus {
     running: bool,
     url: Option<String>,
     position: livemap::LivePosition,
+    ue4ss_log: ue4ss::LogStatus,
 }
 
 fn live_status_of(core: &AppCore) -> LiveStatus {
@@ -1344,6 +1371,7 @@ fn live_status_of(core: &AppCore) -> LiveStatus {
         running: port.is_some(),
         url: port.map(|p| format!("http://127.0.0.1:{p}/")),
         position: livemap::read_position(),
+        ue4ss_log: core.lock().game().map(|g| ue4ss::log_status(&g)).unwrap_or_default(),
     }
 }
 
@@ -1553,12 +1581,7 @@ pub fn run() {
         .setup(|app| {
             let paths = Arc::new(Paths::new(data_dir(app.handle())));
             std::fs::create_dir_all(&paths.data)?;
-            let mut db: Db = read_json(&paths.state).unwrap_or_else(|e| {
-                // Keep the damaged file for inspection instead of overwriting it silently.
-                let _ = std::fs::copy(&paths.state, paths.data.join("state.damaged.json"));
-                eprintln!("{e:#}");
-                Db::default()
-            });
+            let (mut db, recovery_warnings) = persistence::load(&paths.data, &paths.mods)?;
             db.normalize();
             if db.settings.language != "auto" {
                 i18n::set(&db.settings.language);
@@ -1569,7 +1592,7 @@ pub fn run() {
                     db.settings.platform = first.platform;
                 }
             }
-            let deployment: Deployment = read_json(&paths.deployment).unwrap_or_default();
+            let deployment: Deployment = read_json(&paths.deployment)?;
             if !nexus::ENABLED && db.settings.nxm_handler {
                 // A previous build registered nxm://; hand it back.
                 let _ = nexus::set_protocol_handler(false, db.settings.nxm_previous.as_deref());
@@ -1577,7 +1600,10 @@ pub fn run() {
                 db.settings.nxm_previous = None;
             }
             let check_updates = nexus::ENABLED && db.settings.check_updates_on_start && db.settings.nexus_api_key.is_some();
-            let core = Core { paths: paths.clone(), db, deployment, cache: PakCache::default(), nexus_user: None };
+            let mut core = Core { paths: paths.clone(), db, deployment, cache: PakCache::default(), nexus_user: None, recovery_warnings };
+            if let Err(e) = core.refresh_live_map() {
+                core.recovery_warnings.push(tr!("Live-Map-Mod konnte nicht aktualisiert werden: {e:#}", "Could not update the live map mod: {e:#}", e = e));
+            }
             core.save()?;
             let app_core = AppCore {
                 core: Arc::new(Mutex::new(core)),

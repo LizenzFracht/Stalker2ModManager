@@ -1,6 +1,6 @@
 [package]
 name = "stalker2mm"
-version = "0.1.0"
+version = "0.1.1"
 description = "Stalker 2 Mod Manager"
 license = "MIT"
 repository = "https://github.com/LizenzFracht/Stalker2ModManager"

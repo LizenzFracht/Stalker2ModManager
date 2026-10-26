@@ -81,7 +81,7 @@ pub async fn prepare(work: &Path, platform: Platform) -> Result<Prepared> {
     .map_err(|e| anyhow!("{e}"))?
 }
 
-#[derive(serde::Serialize, Clone, Debug, Default)]
+#[derive(serde::Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct LogStatus {
     /// ok | failed | unknown (no log yet)
@@ -90,6 +90,12 @@ pub struct LogStatus {
     pub detail: Option<String>,
     pub log_path: Option<String>,
     pub log_time: u64,
+}
+
+impl Default for LogStatus {
+    fn default() -> Self {
+        Self { state: "unknown".into(), detail: None, log_path: None, log_time: 0 }
+    }
 }
 
 /// Reads UE4SS.log of the last game start and tells whether UE4SS initialised.
@@ -110,7 +116,7 @@ pub fn log_status(game: &crate::game::GameInfo) -> LogStatus {
     }
     let lines: Vec<&str> = text.lines().collect();
     let fatal = lines.iter().rposition(|l| l.contains("Fatal Error"));
-    let state = if fatal.is_some() { "failed" } else { "ok" };
+    let state = if fatal.is_some() { "failed" } else if text.contains("[S2MM LiveMap]") { "ok" } else { "unknown" };
     let detail = fatal.map(|i| {
         lines[i..lines.len().min(i + 4)]
             .iter()
@@ -120,4 +126,28 @@ pub fn log_status(game: &crate::game::GameInfo) -> LogStatus {
             .join("\n")
     });
     LogStatus { state: state.into(), detail, log_path: Some(log.to_string_lossy().into_owned()), log_time: mtime }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn incomplete_log_does_not_claim_ue4ss_started() {
+        let root = std::env::temp_dir().join(format!("s2mm-log-{}", uuid::Uuid::new_v4()));
+        let bin = root.join("Stalker2/Binaries/Win64/ue4ss");
+        std::fs::create_dir_all(&bin).unwrap();
+        let game = crate::game::inspect(&root, &crate::model::Settings::default());
+        for content in ["", "[2026-10-26] Lua Scan attempt 1 (Phase 2)"] {
+            std::fs::write(bin.join("UE4SS.log"), content).unwrap();
+            assert_eq!(log_status(&game).state, "unknown");
+        }
+        std::fs::write(bin.join("UE4SS.log"), "[2026-10-26] Fatal Error: AOB scans could not be completed\nWas unable to find AOB for 'GUObjectArray'").unwrap();
+        let failed = log_status(&game);
+        assert_eq!(failed.state, "failed");
+        assert!(failed.detail.unwrap().contains("GUObjectArray"));
+        std::fs::write(bin.join("UE4SS.log"), "[S2MM LiveMap] aktiv – Position wird geschrieben").unwrap();
+        assert_eq!(log_status(&game).state, "ok");
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

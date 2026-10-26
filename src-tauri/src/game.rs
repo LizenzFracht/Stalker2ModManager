@@ -152,6 +152,24 @@ pub fn config_dir(platform: Platform, settings: &Settings) -> Option<PathBuf> {
     Some(base.join(if platform == Platform::GamePass { "WinGDK" } else { "Windows" }))
 }
 
+#[cfg(test)]
+mod config_tests {
+    use super::*;
+
+    #[test]
+    fn config_location_follows_platform_even_before_folder_exists() {
+        let mut settings = Settings::default();
+        if local_appdata().is_some() {
+            assert!(config_dir(Platform::Steam, &settings).unwrap().ends_with("Stalker2/Saved/Config/Windows"));
+            assert!(config_dir(Platform::GamePass, &settings).unwrap().ends_with("Stalker2/Saved/Config/WinGDK"));
+        }
+        let custom = std::env::temp_dir().join("s2mm-custom-config");
+        settings.config_dir = Some(custom.to_string_lossy().into_owned());
+        assert_eq!(config_dir(Platform::Steam, &settings).unwrap(), custom);
+        assert_eq!(config_dir(Platform::GamePass, &settings).unwrap(), custom);
+    }
+}
+
 /// Steam build id from the app manifest; used to notice game patches.
 fn steam_build(root: &Path) -> Option<String> {
     let steamapps = root.parent()?.parent()?;

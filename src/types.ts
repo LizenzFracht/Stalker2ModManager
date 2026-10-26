@@ -21,6 +21,7 @@ export interface Settings {
   mapPort: number;
   firstRunDone: boolean;
   language: string;
+  protectEngineIni: boolean;
 }
 
 export interface VanillaReport {
@@ -46,8 +47,16 @@ export interface ToolMod {
 export interface ToolsView {
   ue4ss: ToolMod;
   ue4ssInGame: boolean;
+  ue4ssLog: Ue4ssLogStatus;
   liveMapMod: ToolMod;
   mcm: ToolMod;
+}
+
+export interface Ue4ssLogStatus {
+  state: "ok" | "failed" | "unknown";
+  detail: string | null;
+  logPath: string | null;
+  logTime: number;
 }
 
 export interface Binding {
@@ -87,6 +96,7 @@ export interface SaveView {
 }
 
 export interface LiveStatus {
+  ue4ssLog: Ue4ssLogStatus;
   running: boolean;
   url: string | null;
   position: { ok: boolean; age: number; x: number; y: number; z: number; yaw: number };
@@ -183,6 +193,7 @@ export interface NexusUser {
 }
 
 export interface AppState {
+  recoveryWarnings: string[];
   settings: Settings;
   game: GameInfo | null;
   detected: DetectedInstall[];

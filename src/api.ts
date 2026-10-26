@@ -67,6 +67,7 @@ export const api = {
   switchProfile: (id: string) => invoke<AppState>("switch_profile", { id }),
 
   getTweaks: () => invoke<TweakState>("get_tweaks"),
+  setEngineIniProtection: (protect: boolean) => invoke<TweakState>("set_engine_ini_protection", { protect }),
   setTweaks: (changes: Record<string, string | null>) => invoke<TweakState>("set_tweaks", { changes }),
   restoreTweaks: () => invoke<TweakState>("restore_tweaks"),
   exportEngineIni: (path: string) => invoke<void>("export_engine_ini", { path }),

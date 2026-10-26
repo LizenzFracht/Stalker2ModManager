@@ -232,6 +232,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn protected_ini_can_be_edited_imported_and_restored() {
+        let dir = std::env::temp_dir().join(format!("s2mm-ini-protection-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let ini = dir.join("Engine.ini");
+        let original = "[Core.System]\r\nPaths=original\r\n";
+        std::fs::write(&ini, original).unwrap();
+        write(&dir, &BTreeMap::from([("r.FilmGrain".into(), Some("0".into()))]), true).unwrap();
+        assert!(std::fs::metadata(&ini).unwrap().permissions().readonly());
+        write(&dir, &BTreeMap::from([("r.FilmGrain".into(), Some("1".into()))]), true).unwrap();
+        assert_eq!(read(Some(&dir)).values["r.FilmGrain"], "1");
+        let imported = dir.join("import.ini");
+        std::fs::write(&imported, "[SystemSettings]\nr.FilmGrain=0\n").unwrap();
+        import(&dir, &imported, true, true).unwrap();
+        assert!(read(Some(&dir)).read_only);
+        assert_eq!(read(Some(&dir)).values["r.FilmGrain"], "0");
+        restore(&dir).unwrap();
+        assert_eq!(std::fs::read_to_string(&ini).unwrap(), original);
+        assert!(!read(Some(&dir)).read_only);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn merges_imported_ini() {
         let dir = std::env::temp_dir().join(format!("s2mm-ini-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);

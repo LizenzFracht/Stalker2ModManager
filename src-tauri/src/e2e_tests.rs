@@ -291,6 +291,8 @@ fn db_with_staged_mods_serializes() {
     make_zip(&a, &[("x/A_P.pak", fake_pak(&["a/b.cfg"])), ("y/A_P.pak", fake_pak(&["a/b.cfg"]))]);
     let mut db = Db::default();
     let e = stage(&tmp.join("mods"), &a, InstallMeta::default(), None).unwrap();
+    let metadata = tmp.join("mods").join(&e.id).join("mod.json");
+    assert!(metadata.is_file(), "staged mods need metadata even if state saving fails");
     db.profile_mut().mods.push(ProfileMod { id: e.id.clone(), enabled: true });
     db.mods.push(e);
     db.normalize();

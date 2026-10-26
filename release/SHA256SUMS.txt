@@ -1,0 +1,2 @@
+a2058ef94f3ccdae55df5f5ea95538ad8be29e381bc83d094e4ff1331646c3bf  S2MM_0.1.1_windows_x64_portable.zip
+3dec65fce760a541f410f5d765e83492bcd6e67be9610e2e2754e82ada65bbc9  S2MM_0.1.1_windows_x64_setup.exe

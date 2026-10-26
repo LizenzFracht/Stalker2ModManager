@@ -87,6 +87,12 @@ export default function App() {
       <Sidebar conflictCount={conflictCount} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
+        {!!state.recoveryWarnings.length && (
+          <div role="alert" className="max-h-32 shrink-0 overflow-y-auto border-b border-accent/30 bg-accent-soft px-5 py-3 text-xs leading-relaxed">
+            <div className="mb-1 font-medium text-accent">{t("Bitte prüfen")}</div>
+            {state.recoveryWarnings.map((warning, index) => <p key={index}>{warning}</p>)}
+          </div>
+        )}
         <main className="min-h-0 flex-1">
           {page === "mods" && <ModsPage />}
           {page === "conflicts" && <ConflictsPage />}

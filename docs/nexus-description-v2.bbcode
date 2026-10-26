@@ -1,0 +1,95 @@
+[center]
+[size=6][b][color=#e0a526]S2MM[/color][/b][/size]
+[size=4]STALKER 2 MOD MANAGER[/size]
+
+Windows & Linux · English & German · Setup & Portable
+Free and open source · MIT License
+[/center]
+
+[line]
+
+[size=4][b][color=#e0a526]A personal project. Please read this first.[/color][/b][/size]
+
+[b]This app is completely vibe-coded.[/b] I built it with AI assistance as a hobby project for my own S.T.A.L.K.E.R. 2 setup. It has been working well for my purposes so far. That is my experience, not a promise that it will work just as well with every mod collection or on every system.
+
+I do not know how regularly I will keep working on it. Updates, fixes and replies may be sporadic, and development may stop altogether. There is no support schedule or commitment to keeping up with future game patches.
+
+The source is available under the MIT License. Use it, change it, fork it, improve it, or leave it alone.
+
+[i]Take it and do whatever you want with it. Or don't.[/i]
+
+[line]
+
+[size=4][b][color=#e0a526]What it does[/color][/b][/size]
+
+[b]Mod installation[/b]
+Drop ZIP, 7z or RAR archives, loose .pak/.utoc/.ucas files, DLL/ASI plugins or folders into the app. S2MM recognises classic pak mods, Zone Kit mods, UE4SS Lua mods and binary plugins, and places them in the appropriate locations. Mods with FOMOD installers or multiple variants get an options dialog.
+
+[b]Load order and conflicts[/b]
+Reorder mods by drag and drop. Mods further down the list take priority. Inspect overlapping files to see which mod overrides another, or preview an auto-sort suggestion before applying it.
+
+[b]Profiles and deployment[/b]
+Keep separate mod profiles, including a built-in Vanilla profile. Mods live in a separate library and are linked or copied into the game. Original files replaced during managed deployment are backed up.
+
+[b]Mod settings and key bindings[/b]
+Optional support for Mod Configuration Menu (MCM): edit settings stored in an existing MCM settings file without launching the game. MCM must be installed separately and is not included with S2MM. Available settings depend on your installed mods and their MCM support.
+
+Independently of MCM, inspect key bindings found in mod scripts and configuration files, spot duplicate bindings, and edit supported bindings or config files from the app.
+
+[b]Engine.ini tweaks[/b]
+Change selected graphics and engine settings, add your own CVars, and import or export Engine.ini files. S2MM backs up the file before its first modification.
+
+[b]Live map[/b]
+Open joric's interactive map in your browser and display your in-game position and viewing direction, with follow mode and layer filters. Position tracking requires UE4SS and the included S2MM Live-Map mod.
+
+[line]
+
+[size=4][b][color=#e0a526]Getting started[/color][/b][/size]
+
+[list=1]
+[*]Back up your saves and any existing manual mod setup.
+[*]Start S2MM and check the detected game folder.
+[*]Drop your downloaded mod archives into the app.
+[*]Choose any installation options, arrange the load order and review conflicts.
+[*]Close the game, click [b]Apply[/b], then launch the game.
+[/list]
+
+[b]Portable version:[/b] Extract the archive into a writable folder and run the app. Its data stays beside it.
+
+[line]
+
+[size=4][b][color=#e0a526]Limitations and dependencies[/color][/b][/size]
+
+[list]
+[*][b]Expect rough edges.[/b] This is a personal hobby tool with limited testing, not a professionally maintained product. Keep backups.
+[*][b]UE4SS compatibility matters.[/b] Game updates can break UE4SS. If UE4SS cannot start, Lua mods and live position tracking will not work.
+[*][b]Nexus downloads:[/b] The built-in Nexus API integration is disabled in public builds pending application registration. Download mods in your browser and drop the archives into S2MM.
+[*][b]Linux is experimental.[/b] Linux/Proton support has not been personally tested on a Linux system.
+[*][b]Conflict detection has limits.[/b] Seeing overlapping files does not establish whether an entire mod collection is compatible.
+[/list]
+
+[line]
+
+[size=4][b][color=#e0a526]Source, feedback and contributions[/color][/b][/size]
+
+[url=https://github.com/LizenzFracht/Stalker2ModManager]Source code and issue tracker on GitHub[/url]
+
+Bug reports and contributions are welcome. If you report an issue, include your app version, game version, platform and steps to reproduce it. Please do not include API keys or other private information.
+
+I may not be able to investigate or reply. If you want to take the project in your own direction, you are welcome to fork it under the MIT License.
+
+[line]
+
+[size=4][b][color=#e0a526]Credits[/color][/b][/size]
+
+[list]
+[*][url=https://github.com/joric/stalker]joric[/url] — interactive S.T.A.L.K.E.R. 2 map
+[*][url=https://github.com/UE4SS-RE/RE-UE4SS]UE4SS / RE-UE4SS[/url] — Lua scripting framework and game configuration
+[*]The Mod Configuration Menu authors — MCM support
+[*][url=https://github.com/trumank/uesave-rs]uesave[/url] — Unreal SaveGame handling
+[*]UnRAR by Alexander Roshal / RARLAB — RAR extraction
+[*]Tauri, React and the other open-source projects listed in THIRD_PARTY_NOTICES.md and the app's About screen
+[*]Inspired by Definitive Mod Manager and CDUMM for Crimson Desert
+[/list]
+
+[i]Unofficial fan project. Not affiliated with or endorsed by GSC Game World or Nexus Mods. Third-party components retain their respective licenses.[/i]

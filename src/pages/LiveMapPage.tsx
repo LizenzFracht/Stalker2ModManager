@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { CheckCircle2, Circle, Download, ExternalLink, Map as MapIcon, Play, Square, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Circle, Download, ExternalLink, Map as MapIcon, Play, Square, Upload } from "lucide-react";
 import { api } from "../api";
 import { useStore } from "../store";
 import { Button, Toggle } from "../components/ui";
@@ -41,6 +41,8 @@ export function LiveMapPage() {
   const applied = ue4ssReady && modReady && !state.pending;
   const pos = status?.position;
   const live = !!pos?.ok && pos.age < 6;
+  const ue4ssLog = status?.ue4ssLog ?? state.tools.ue4ssLog;
+  const ue4ssFailed = ue4ssLog?.state === "failed" && !live;
 
   const apply = async () => {
     const r = await run(() => api.apply(), { busy: t("Mods werden angewendet …") });
@@ -59,9 +61,20 @@ export function LiveMapPage() {
           {t(". S2MM startet dafür einen lokalen Server (nur auf diesem PC erreichbar), der die Karte im Browser öffnet. Eine kleine UE4SS-Mod meldet die Position einmal pro Sekunde.")}
         </p>
 
+        {ue4ssFailed && (
+          <div role="alert" className="mt-5 rounded-lg border border-danger/40 bg-danger-soft px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-danger">
+              <AlertTriangle size={17} className="shrink-0" />
+              {t("UE4SS konnte beim letzten Spielstart nicht starten.")}
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-text">{t("Ohne funktionierendes UE4SS laufen keine Lua-Mods und keine Live-Positionsdaten. Prüfe eine zur Spielversion passende UE4SS-Version und die Stalker-2-Konfiguration.")}</p>
+            {ue4ssLog.detail && <pre className="mt-3 whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-muted">{ue4ssLog.detail}</pre>}
+            {ue4ssLog.logPath && <p className="mt-2 break-all font-mono text-[10px] text-dim">{ue4ssLog.logPath}</p>}
+          </div>
+        )}
         <ol className="mt-6 divide-y divide-line rounded-lg border border-line bg-panel">
           <Step
-            done={ue4ssReady}
+            done={ue4ssReady && !ue4ssFailed}
             title={t("UE4SS")}
             action={
               ue4ss.modId ? (
@@ -88,7 +101,7 @@ export function LiveMapPage() {
             {ue4ss.modId
               ? t("Von S2MM verwaltet{v}.", { v: ue4ss.version ? ` (${ue4ss.version})` : "" })
               : ue4ssInGame
-                ? "Manuell installiert gefunden."
+                ? t("Manuell installiert gefunden.")
                 : t("Lua-Scripting-Framework – wird von GitHub geladen, inklusive Stalker-2-Konfiguration.")}
           </Step>
           <Step
@@ -114,7 +127,7 @@ export function LiveMapPage() {
               )
             }
           >
-            {t("Kleines Lua-Skript, das die Position nach")} <code className="font-mono">{"%LOCALAPPDATA%\\S2MM\\live.json"}</code> {t("schreibt.")}
+            {t("Kleines Lua-Skript, das die Position nach")} <code className="font-mono">{"%LOCALAPPDATA%\\S2MM-Live\\live.json"}</code> {t("schreibt.")}
           </Step>
           <Step
             done={applied}

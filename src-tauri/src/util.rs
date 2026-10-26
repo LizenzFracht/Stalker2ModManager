@@ -85,15 +85,39 @@ pub fn read_json<T: DeserializeOwned + Default>(p: &Path) -> Result<T> {
     serde_json::from_slice(&data).with_context(|| tr!("{} ist beschädigt", "{} is damaged", p.display()))
 }
 
-/// Atomic JSON write (write temp file, then rename).
+/// Atomic JSON write. Flush the unique temporary file before replacement and tolerate
+/// short Windows sharing locks (e.g. another process reading/scanning the old file).
 pub fn write_json<T: Serialize>(p: &Path, value: &T) -> Result<()> {
+    let bytes = serde_json::to_vec_pretty(value)?;
+    write_bytes(p, &bytes)
+}
+
+pub fn write_bytes(p: &Path, bytes: &[u8]) -> Result<()> {
+    use std::io::Write;
     if let Some(dir) = p.parent() {
         std::fs::create_dir_all(dir)?;
     }
-    let tmp = p.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_vec_pretty(value)?)?;
-    std::fs::rename(&tmp, p).with_context(|| tr!("{} schreiben", "Writing {}", p.display()))?;
-    Ok(())
+    let tmp = p.with_extension(format!("json.{}.tmp", uuid::Uuid::new_v4().simple()));
+    let result = (|| -> Result<()> {
+        let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        drop(file);
+        for attempt in 0..6 {
+            match std::fs::rename(&tmp, p) {
+                Ok(()) => return Ok(()),
+                Err(e) if cfg!(windows) && attempt < 5 && matches!(e.raw_os_error(), Some(5 | 32 | 33)) => {
+                    std::thread::sleep(std::time::Duration::from_millis(20 << attempt));
+                }
+                Err(e) => return Err(e).with_context(|| tr!("{} schreiben", "Writing {}", p.display())),
+            }
+        }
+        unreachable!()
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result
 }
 
 /// Resolves a relative path case-insensitively below `root` (FOMOD paths are often sloppy).
@@ -165,4 +189,30 @@ pub fn ext_lower(p: &str) -> String {
         .extension()
         .map(|e| e.to_string_lossy().to_lowercase())
         .unwrap_or_default()
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    use std::os::windows::fs::OpenOptionsExt;
+
+    #[test]
+    fn json_write_waits_for_temporary_windows_sharing_lock() {
+        let dir = std::env::temp_dir().join(format!("s2mm-sharing-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("state.json");
+        std::fs::write(&path, b"{\"generation\":1}").unwrap();
+        let locked = std::fs::OpenOptions::new().read(true).share_mode(1).open(&path).unwrap();
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            drop(locked);
+        });
+        let result = write_json(&path, &serde_json::json!({"generation":2}));
+        release.join().unwrap();
+        result.expect("temporary sharing locks must be retried");
+        let stored: serde_json::Value = read_json(&path).unwrap();
+        assert_eq!(stored["generation"], 2);
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "temporary files must be cleaned up");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }

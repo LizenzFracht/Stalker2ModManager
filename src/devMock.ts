@@ -5,6 +5,10 @@ import { mockConvertFileSrc, mockIPC, mockWindows } from "@tauri-apps/api/mocks"
 import type { AppState, Binding, ConflictReport, ModDetails, ModView, SaveView, TweakState } from "./types";
 
 const params = new URLSearchParams(location.search);
+let protectEngineIni = true;
+const ue4ssLog = params.get("ue4ss") === "failed"
+  ? { state: "failed" as const, detail: "Fatal Error: AOB scans could not be completed\nWas unable to find AOB for 'GUObjectArray'", logPath: "Stalker2/Binaries/Win64/ue4ss/UE4SS.log", logTime: 1761400000 }
+  : { state: "unknown" as const, detail: null, logPath: null, logTime: 0 };
 const NEXUS = "stalker2heartofchornobyl";
 
 const base = {
@@ -56,6 +60,7 @@ let mods: ModView[] = [
 ];
 
 const state = (): AppState => ({
+  recoveryWarnings: params.has("recovery") ? [params.get("lang") === "de" ? "Mod aus der Bibliothek wiederhergestellt (deaktiviert)." : "Mod recovered from the library (disabled)."] : [],
   settings: {
     gamePath: "C:\\Program Files (x86)\\Steam\\steamapps\\common\\S.T.A.L.K.E.R. 2 Heart of Chornobyl",
     platform: "steam",
@@ -74,6 +79,7 @@ const state = (): AppState => ({
     mapPort: 27420,
     firstRunDone: params.get("welcome") !== "1",
     language: params.get("lang") ?? "auto",
+    protectEngineIni,
   },
   game: {
     path: "C:\\Program Files (x86)\\Steam\\steamapps\\common\\S.T.A.L.K.E.R. 2 Heart of Chornobyl",
@@ -104,6 +110,7 @@ const state = (): AppState => ({
   tools: {
     ue4ss: { modId: "ue4ss", enabled: true, version: "v3.0.1-1183" },
     ue4ssInGame: true,
+    ue4ssLog,
     liveMapMod: { modId: "livemap", enabled: true, version: "0.1.0" },
     mcm: { modId: "mcm", enabled: true, version: "2.0" },
   },
@@ -174,6 +181,12 @@ export function install() {
       case "get_tweaks":
       case "set_tweaks":
         return tweaks;
+      case "set_engine_ini_protection":
+        if (params.has("failProtection")) throw new Error("Could not change file permissions");
+        protectEngineIni = a.protect as boolean;
+        tweaks.readOnly = protectEngineIni;
+        if (params.has("failProtectionSave")) throw new Error("Could not save state; recovery snapshot retained");
+        return tweaks;
       case "get_downloads":
         return [];
       case "get_keybinds":
@@ -184,7 +197,7 @@ export function install() {
         return save;
       case "livemap_status":
       case "livemap_start":
-        return { running: true, url: "http://127.0.0.1:27420/", position: { ok: true, age: 1, x: 402400, y: 578997, z: 1200, yaw: 37 } };
+        return { running: true, url: "http://127.0.0.1:27420/", ue4ssLog, position: { ok: ue4ssLog.state !== "failed", age: 1, x: 402400, y: 578997, z: 1200, yaw: 37 } };
       case "autosort_preview":
         return [
           { id: "ue4ss", from: 0, to: 0, reason: "Framework/base" },

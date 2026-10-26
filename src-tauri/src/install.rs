@@ -127,22 +127,9 @@ pub fn stage(mods_root: &Path, src: &Path, meta: InstallMeta, existing: Option<&
     }
     let needs_setup = !layout.groups.is_empty() && (existing.is_none() || !mapped_all);
 
-    let final_dir = mods_root.join(&id);
-    if final_dir.exists() {
-        let old = mods_root.join(format!("{id}.old"));
-        if old.exists() {
-            std::fs::remove_dir_all(&old)?;
-        }
-        std::fs::rename(&final_dir, &old).context(tr!("Alte Mod-Version verschieben (Dateien in Benutzung?)", "Moving the old mod version (files in use?)"))?;
-        std::fs::rename(&tmp, &final_dir)?;
-        let _ = std::fs::remove_dir_all(&old);
-    } else {
-        std::fs::rename(&tmp, &final_dir)?;
-    }
-
     let t = now();
-    Ok(ModEntry {
-        id,
+    let entry = ModEntry {
+        id: id.clone(),
         name: display_name,
         version: meta.version.or(version).or(parsed.and_then(|p| p.2)).or(existing.and_then(|e| e.version.clone())),
         author: meta.author.or(author).or(existing.and_then(|e| e.author.clone())),
@@ -158,7 +145,22 @@ pub fn stage(mods_root: &Path, src: &Path, meta: InstallMeta, existing: Option<&
         selection,
         needs_setup,
         update: None,
-    })
+    };
+    crate::util::write_json(&tmp.join("mod.json"), &entry)?;
+    let final_dir = mods_root.join(&id);
+    if final_dir.exists() {
+        let old = mods_root.join(format!("{id}.old"));
+        if old.exists() {
+            std::fs::remove_dir_all(&old)?;
+        }
+        std::fs::rename(&final_dir, &old).context(tr!("Alte Mod-Version verschieben (Dateien in Benutzung?)", "Moving the old mod version (files in use?)"))?;
+        std::fs::rename(&tmp, &final_dir)?;
+        let _ = std::fs::remove_dir_all(&old);
+    } else {
+        std::fs::rename(&tmp, &final_dir)?;
+    }
+
+    Ok(entry)
 }
 
 #[cfg(test)]

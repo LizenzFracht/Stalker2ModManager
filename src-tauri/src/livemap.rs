@@ -15,6 +15,59 @@ const UPSTREAM: &str = "https://joric.github.io/stalker";
 pub const LUA_MOD: &str = include_str!("../livemap/main.lua");
 const OVERLAY: &str = include_str!("../livemap/overlay.js");
 
+/// Upgrade only our unmodified legacy script. Replacing the inode keeps deployed
+/// hardlinks unchanged until the user applies the new deployment with the game closed.
+pub fn refresh_library_script(files: &Path) -> Result<bool> {
+    let legacy = LUA_MOD.replace("S2MM-Live", "S2MM").replace("\r\n", "\n");
+    for entry in walkdir::WalkDir::new(files) {
+        let entry = entry?;
+        if !entry.file_type().is_file() || entry.file_name() != "main.lua" {
+            continue;
+        }
+        let path = entry.path();
+        if path.parent().and_then(Path::file_name).map(|n| n.eq_ignore_ascii_case("Scripts")) != Some(true)
+            || path.parent().and_then(Path::parent).and_then(Path::file_name).map(|n| n.eq_ignore_ascii_case("S2MM_LiveMap")) != Some(true) {
+            continue;
+        }
+        let content = std::fs::read_to_string(path)?;
+        if content.replace("\r\n", "\n") != legacy {
+            continue;
+        }
+        let backup = path.with_extension("lua.s2mm-backup");
+        if !backup.exists() {
+            crate::util::write_bytes(&backup, content.as_bytes())?;
+        }
+        crate::util::write_bytes(path, LUA_MOD.as_bytes())?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+
+    #[test]
+    fn refreshes_bundled_script_without_changing_deployed_hardlink() {
+        let root = std::env::temp_dir().join(format!("s2mm-map-migrate-{}", uuid::Uuid::new_v4()));
+        let files = root.join("files");
+        let path = files.join("S2MM_LiveMap/Scripts/main.lua");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let legacy = LUA_MOD.replace("S2MM-Live", "S2MM");
+        std::fs::write(&path, &legacy).unwrap();
+        let deployed = root.join("deployed.lua");
+        std::fs::hard_link(&path, &deployed).unwrap();
+        assert!(refresh_library_script(&files).unwrap());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), LUA_MOD);
+        assert_eq!(std::fs::read_to_string(&deployed).unwrap(), legacy);
+        assert!(!refresh_library_script(&files).unwrap());
+        std::fs::write(&path, "-- user customization").unwrap();
+        assert!(!refresh_library_script(&files).unwrap());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "-- user customization");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
 pub struct Server {
     pub port: u16,
     stop: tokio::sync::oneshot::Sender<()>,

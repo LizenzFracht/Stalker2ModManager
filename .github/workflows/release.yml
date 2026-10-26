@@ -43,6 +43,9 @@ jobs:
       - run: npm ci
 
       - name: Build
+        env:
+          CFLAGS: ${{ runner.os == 'Windows' && '/DNDEBUG' || '-DNDEBUG' }}
+          CXXFLAGS: ${{ runner.os == 'Windows' && '/DNDEBUG' || '-DNDEBUG' }}
         run: npx tauri build --bundles ${{ matrix.bundles }}
 
       - name: Collect Windows packages
