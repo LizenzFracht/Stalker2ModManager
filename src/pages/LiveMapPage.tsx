@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { Button, Toggle } from "../components/ui";
 import type { LiveStatus } from "../types";
+import { t } from "../i18n";
 
 function Step({ done, title, children, action }: { done: boolean; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
@@ -26,10 +27,10 @@ export function LiveMapPage() {
     let alive = true;
     const poll = () => api.livemapStatus().then((s) => alive && setStatus(s)).catch(() => {});
     poll();
-    const t = setInterval(poll, 1500);
+    const timer = setInterval(poll, 1500);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearInterval(timer);
     };
   }, []);
 
@@ -42,31 +43,30 @@ export function LiveMapPage() {
   const live = !!pos?.ok && pos.age < 6;
 
   const apply = async () => {
-    const r = await run(() => api.apply(), { busy: "Mods werden angewendet …" });
+    const r = await run(() => api.apply(), { busy: t("Mods werden angewendet …") });
     if (r) setState(r.state);
   };
 
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-8 py-7">
-        <h1 className="font-display text-3xl font-semibold tracking-wide">Live-Karte</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-wide">{t("Live-Karte")}</h1>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-          Zeigt deine Position im Spiel live auf{" "}
+          {t("Zeigt deine Position im Spiel live auf")}{" "}
           <button className="text-accent hover:underline" onClick={() => run(() => api.openUrl("https://github.com/joric/stalker"))}>
-            joric's interaktiver Stalker-2-Karte
+            {t("joric's interaktiver Stalker-2-Karte")}
           </button>
-          . S2MM startet dafür einen lokalen Server (nur auf diesem PC erreichbar), der die Karte im Browser öffnet. Eine kleine UE4SS-Mod
-          meldet die Position einmal pro Sekunde.
+          {t(". S2MM startet dafür einen lokalen Server (nur auf diesem PC erreichbar), der die Karte im Browser öffnet. Eine kleine UE4SS-Mod meldet die Position einmal pro Sekunde.")}
         </p>
 
         <ol className="mt-6 divide-y divide-line rounded-lg border border-line bg-panel">
           <Step
             done={ue4ssReady}
-            title="UE4SS"
+            title={t("UE4SS")}
             action={
               ue4ss.modId ? (
                 <Toggle
-                  label="UE4SS aktiv"
+                  label={t("UE4SS aktiv")}
                   checked={ue4ss.enabled}
                   onChange={async (v) => {
                     const s = await run(() => api.setToolEnabled("ue4ss", v));
@@ -76,28 +76,28 @@ export function LiveMapPage() {
               ) : (
                 !ue4ssInGame && (
                   <Button size="sm" icon={<Download size={14} />} onClick={async () => {
-                    const s = await run(() => api.ue4ssInstall(), { busy: "UE4SS wird heruntergeladen …", success: "UE4SS installiert." });
+                    const s = await run(() => api.ue4ssInstall(), { busy: t("UE4SS wird heruntergeladen …"), success: "UE4SS installiert." });
                     if (s) setState(s);
                   }}>
-                    Installieren
+                    {t("Installieren")}
                   </Button>
                 )
               )
             }
           >
             {ue4ss.modId
-              ? `Von S2MM verwaltet${ue4ss.version ? ` (${ue4ss.version})` : ""}.`
+              ? t("Von S2MM verwaltet{v}.", { v: ue4ss.version ? ` (${ue4ss.version})` : "" })
               : ue4ssInGame
                 ? "Manuell installiert gefunden."
-                : "Lua-Scripting-Framework – wird von GitHub geladen, inklusive Stalker-2-Konfiguration."}
+                : t("Lua-Scripting-Framework – wird von GitHub geladen, inklusive Stalker-2-Konfiguration.")}
           </Step>
           <Step
             done={modReady}
-            title="S2MM-Live-Map-Mod"
+            title={t("S2MM-Live-Map-Mod")}
             action={
               liveMapMod.modId ? (
                 <Toggle
-                  label="Live-Map-Mod aktiv"
+                  label={t("Live-Map-Mod aktiv")}
                   checked={liveMapMod.enabled}
                   onChange={async (v) => {
                     const s = await run(() => api.setToolEnabled("livemap", v));
@@ -106,34 +106,34 @@ export function LiveMapPage() {
                 />
               ) : (
                 <Button size="sm" icon={<Download size={14} />} onClick={async () => {
-                  const s = await run(() => api.livemapInstallMod(), { success: "Live-Map-Mod hinzugefügt." });
+                  const s = await run(() => api.livemapInstallMod(), { success: t("Live-Map-Mod hinzugefügt.") });
                   if (s) setState(s);
                 }}>
-                  Hinzufügen
+                  {t("Hinzufügen")}
                 </Button>
               )
             }
           >
-            Kleines Lua-Skript, das die Position nach <code className="font-mono">%LOCALAPPDATA%\S2MM\live.json</code> schreibt.
+            {t("Kleines Lua-Skript, das die Position nach")} <code className="font-mono">{"%LOCALAPPDATA%\\S2MM\\live.json"}</code> {t("schreibt.")}
           </Step>
           <Step
             done={applied}
-            title="Im Spiel anwenden"
-            action={state.pending && <Button size="sm" variant="primary" icon={<Upload size={14} />} onClick={apply}>Anwenden</Button>}
+            title={t("Im Spiel anwenden")}
+            action={state.pending && <Button size="sm" variant="primary" icon={<Upload size={14} />} onClick={apply}>{t("Anwenden")}</Button>}
           >
-            Danach Stalker 2 (neu) starten.
+            {t("Danach Stalker 2 (neu) starten.")}
           </Step>
           <Step
             done={!!status?.running}
-            title="Karten-Server"
+            title={t("Karten-Server")}
             action={
               status?.running ? (
                 <div className="flex gap-2">
                   <Button size="sm" variant="primary" icon={<ExternalLink size={14} />} onClick={() => run(() => api.livemapStart(true))}>
-                    Im Browser öffnen
+                    {t("Im Browser öffnen")}
                   </Button>
                   <Button size="sm" icon={<Square size={13} />} onClick={() => run(() => api.livemapStop()).then((s) => s && setStatus(s))}>
-                    Stoppen
+                    {t("Stoppen")}
                   </Button>
                 </div>
               ) : (
@@ -145,16 +145,16 @@ export function LiveMapPage() {
                     const s = await run(() => api.livemapStart(true));
                     if (s) {
                       setStatus(s);
-                      toast("info", "Karte wird im Browser geöffnet. Der erste Start lädt die Kartendaten (ca. 50 MB).");
+                      toast("info", t("Karte wird im Browser geöffnet. Der erste Start lädt die Kartendaten (ca. 50 MB)."));
                     }
                   }}
                 >
-                  Starten
+                  {t("Starten")}
                 </Button>
               )
             }
           >
-            {status?.url ? <span className="font-mono">{status.url}</span> : `Port ${state.settings.mapPort} (änderbar in den Einstellungen)`}
+            {status?.url ? <span className="font-mono">{status.url}</span> : t("Port {port} (änderbar in den Einstellungen)", { port: state.settings.mapPort })}
           </Step>
         </ol>
 
@@ -163,18 +163,17 @@ export function LiveMapPage() {
           <div className="flex-1">
             <div className="flex items-center gap-2 text-sm font-medium">
               <span className={`h-2 w-2 rounded-full ${live ? "pulse-dot bg-ok" : "bg-dim"}`} />
-              {live ? "Spiel verbunden" : pos?.ok ? `Letzte Position vor ${pos.age} s` : "Noch keine Positionsdaten"}
+              {live ? t("Spiel verbunden") : pos?.ok ? t("Letzte Position vor {n} s", { n: pos.age }) : t("Noch keine Positionsdaten")}
             </div>
             {pos?.ok && (
               <div className="mt-1 font-mono text-xs text-muted">
-                X {Math.round(pos.x)} · Y {Math.round(pos.y)} · Z {Math.round(pos.z)} · Blick {Math.round(pos.yaw)}°
+                X {Math.round(pos.x)} · Y {Math.round(pos.y)} · Z {Math.round(pos.z)} · {t("Blick")} {Math.round(pos.yaw)}°
               </div>
             )}
           </div>
         </div>
         <p className="mt-3 text-xs leading-relaxed text-dim">
-          Kartendaten und -kacheln stammen von joric.github.io (Unlicense) und werden lokal zwischengespeichert. Im Browser lässt sich
-          „Folgen“ ein- und ausschalten; Ziehen der Karte beendet das Folgen.
+          {t("Kartendaten und -kacheln stammen von joric.github.io (Unlicense) und werden lokal zwischengespeichert. Im Browser lässt sich „Folgen“ ein- und ausschalten; Ziehen der Karte beendet das Folgen.")}
         </p>
       </div>
     </div>

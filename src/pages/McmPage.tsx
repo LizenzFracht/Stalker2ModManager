@@ -5,6 +5,7 @@ import { useStore } from "../store";
 import { KeyCapture, KeyChip } from "../components/KeyCapture";
 import { Button, Empty, IconButton, Toggle, confirmDialog, formatDate } from "../components/ui";
 import type { SaveFileInfo, SaveLeaf, SaveView } from "../types";
+import { t } from "../i18n";
 
 type Draft = Record<string, boolean | number | string>;
 
@@ -60,7 +61,7 @@ export function McmPage() {
   const save = async () => {
     if (!current) return;
     const edits = Object.entries(draft).map(([pointer, v]) => ({ pointer, value: v }));
-    const v = await run(() => api.writeSave(current, edits), { success: "Einstellungen gespeichert – wirken beim nächsten Spielstart." });
+    const v = await run(() => api.writeSave(current, edits), { success: t("Einstellungen gespeichert – wirken beim nächsten Spielstart.") });
     if (v) {
       setView(v);
       setDraft({});
@@ -70,28 +71,27 @@ export function McmPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-8 py-7">
-        <h1 className="font-display text-3xl font-semibold tracking-wide">Mod-Einstellungen</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-wide">{t("Mod-Einstellungen")}</h1>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-          Einstellungen aus dem <strong className="text-text">Mod Configuration Menu (MCM)</strong> und anderen Mods, die ihre Werte als
-          SaveGame speichern – bearbeitbar ohne das Spiel zu starten. Vor der ersten Änderung wird eine Sicherung angelegt.
+          {t("Einstellungen aus dem")} <strong className="text-text">Mod Configuration Menu (MCM)</strong> {t("und anderen Mods, die ihre Werte als SaveGame speichern – bearbeitbar ohne das Spiel zu starten. Vor der ersten Änderung wird eine Sicherung angelegt.")}
         </p>
 
         <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-panel px-4 py-3">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium">Mod Configuration Menu</div>
+            <div className="text-sm font-medium">{t("Mod Configuration Menu")}</div>
             <div className="text-xs text-muted">
-              {mcm.modId ? (mcm.enabled ? "Installiert und aktiv – Menü im Spiel mit B öffnen." : "Installiert, aber deaktiviert.") : "Nicht in S2MM installiert."}
+              {mcm.modId ? (mcm.enabled ? t("Installiert und aktiv – Menü im Spiel mit B öffnen.") : t("Installiert, aber deaktiviert.")) : t("Nicht in S2MM installiert.")}
             </div>
           </div>
           {mcm.modId ? (
             <Toggle
-              label="MCM aktiv"
+              label={t("MCM aktiv")}
               checked={mcm.enabled}
               onChange={async (v) => {
                 const s = await run(() => api.setToolEnabled("mcm", v));
                 if (s) {
                   setState(s);
-                  toast("info", "Zum Übernehmen ins Spiel „Anwenden“ klicken.");
+                  toast("info", t("Zum Übernehmen ins Spiel „Anwenden“ klicken."));
                 }
               }}
             />
@@ -101,16 +101,16 @@ export function McmPage() {
               icon={<ExternalLink size={14} />}
               onClick={() => run(() => api.openUrl(`${NEXUS_GAME_URL}/search/?gsearch=Mod%20Configuration%20Menu`))}
             >
-              Auf Nexus suchen
+              {t("Auf Nexus suchen")}
             </Button>
           )}
         </div>
 
         {files === null ? (
-          <p className="mt-8 text-sm text-muted">Lade …</p>
+          <p className="mt-8 text-sm text-muted">{t("Lade …")}</p>
         ) : files.length === 0 ? (
-          <Empty icon={<ListChecks size={44} />} title="Noch keine Mod-Einstellungen">
-            MCM legt <code className="font-mono">MCM_Settings.sav</code> an, sobald du im Spiel einmal Einstellungen änderst.
+          <Empty icon={<ListChecks size={44} />} title={t("Noch keine Mod-Einstellungen")}>
+            {t("MCM legt")} <code className="font-mono">MCM_Settings.sav</code> {t("an, sobald du im Spiel einmal Einstellungen änderst.")}
             <br />
             <span className="font-mono text-[11px] text-dim">{dir}</span>
           </Empty>
@@ -120,7 +120,7 @@ export function McmPage() {
               <select
                 value={current ?? ""}
                 onChange={(e) => setCurrent(e.target.value)}
-                aria-label="Einstellungsdatei"
+                aria-label={t("Einstellungsdatei")}
                 className="h-9 rounded-md border border-line-strong bg-bg px-2.5 text-sm focus:border-accent focus:outline-none"
               >
                 {files.map((f) => (
@@ -129,7 +129,7 @@ export function McmPage() {
                   </option>
                 ))}
               </select>
-              <IconButton label="Neu laden" onClick={() => current && run(() => api.readSave(current)).then((v) => v && (setView(v), setDraft({})))}>
+              <IconButton label={t("Neu laden")} onClick={() => current && run(() => api.readSave(current)).then((v) => v && (setView(v), setDraft({})))}>
                 <RefreshCw size={15} />
               </IconButton>
               <div className="relative ml-auto w-64">
@@ -137,26 +137,26 @@ export function McmPage() {
                 <input
                   value={mcmFilter}
                   onChange={(e) => setMcmFilter(e.target.value)}
-                  placeholder="Mod oder Einstellung"
-                  aria-label="Einstellungen filtern"
+                  placeholder={t("Mod oder Einstellung")}
+                  aria-label={t("Einstellungen filtern")}
                   className="h-9 w-full rounded-md border border-line-strong bg-bg pl-9 pr-3 text-sm placeholder:text-dim focus:border-accent focus:outline-none"
                 />
               </div>
               <label className="flex items-center gap-2 text-xs text-muted">
                 <input type="checkbox" checked={showText} onChange={(e) => setShowText(e.target.checked)} className="accent-[var(--color-accent)]" />
-                Textfelder zeigen
+                {t("Textfelder zeigen")}
               </label>
             </div>
 
             {!view ? (
-              <p className="mt-6 text-sm text-muted">Lese SaveGame …</p>
+              <p className="mt-6 text-sm text-muted">{t("Lese SaveGame …")}</p>
             ) : visible.length === 0 ? (
-              <Empty icon={<FileWarning size={40} />} title="Keine passenden Einträge" />
+              <Empty icon={<FileWarning size={40} />} title={t("Keine passenden Einträge")} />
             ) : (
               <div className="mt-5 space-y-5">
                 {visible.map(([group, leaves]) => (
                   <section key={group}>
-                    <h2 className="mb-2 truncate text-sm font-medium text-accent" title={group}>{group}</h2>
+                    <h2 className="mb-2 truncate text-sm font-medium text-accent" title={t(group)}>{t(group)}</h2>
                     <div className="divide-y divide-line rounded-lg border border-line bg-panel">
                       {leaves.map((l) => {
                         const v = value(l);
@@ -165,7 +165,7 @@ export function McmPage() {
                           <div key={l.pointer} className="flex items-center gap-4 px-4 py-2.5">
                             <div className="min-w-0 flex-1 text-sm">
                               {l.label}
-                              {changed && <span className="ml-2 text-xs text-accent">geändert</span>}
+                              {changed && <span className="ml-2 text-xs text-accent">{t("geändert")}</span>}
                             </div>
                             {l.kind === "bool" && (
                               <Toggle label={l.label} checked={Boolean(v)} onChange={(nv) => setDraft((d) => ({ ...d, [l.pointer]: nv }))} />
@@ -191,7 +191,7 @@ export function McmPage() {
                             {l.kind === "key" && (
                               <>
                                 <KeyChip k={String(v)} />
-                                <IconButton label="Taste ändern" onClick={() => setKeyLeaf(l)}>
+                                <IconButton label={t("Taste ändern")} onClick={() => setKeyLeaf(l)}>
                                   <Pencil size={14} />
                                 </IconButton>
                               </>
@@ -206,13 +206,13 @@ export function McmPage() {
             )}
 
             <div className="sticky bottom-0 mt-8 flex items-center gap-3 border-t border-line bg-bg/95 py-4 backdrop-blur">
-              <span className="text-xs text-muted">{dirty ? `${dirty} Änderung(en) nicht gespeichert` : "Alles gespeichert"}</span>
+              <span className="text-xs text-muted">{dirty ? t("{n} Änderung(en) nicht gespeichert", { n: dirty }) : t("Alles gespeichert")}</span>
               <Button
                 variant="ghost"
                 size="sm"
                 icon={<History size={14} />}
                 onClick={async () => {
-                  if (!current || !(await confirmDialog("Die Einstellungsdatei auf den Stand vor der ersten Änderung durch S2MM zurücksetzen?", "Zurücksetzen"))) return;
+                  if (!current || !(await confirmDialog(t("Die Einstellungsdatei auf den Stand vor der ersten Änderung durch S2MM zurücksetzen?"), t("Zurücksetzen")))) return;
                   const v = await run(() => api.restoreSave(current), { success: "Original wiederhergestellt." });
                   if (v) {
                     setView(v);
@@ -220,20 +220,20 @@ export function McmPage() {
                   }
                 }}
               >
-                Original wiederherstellen
+                {t("Original wiederherstellen")}
               </Button>
               <Button variant="ghost" className="ml-auto" disabled={!dirty} onClick={() => setDraft({})}>
-                Verwerfen
+                {t("Verwerfen")}
               </Button>
               <Button variant="primary" icon={<Save size={16} />} disabled={!dirty} onClick={save}>
-                Speichern
+                {t("Speichern")}
               </Button>
             </div>
           </>
         )}
         <p className="mt-4 text-xs text-dim">
-          Tipp: Tasten aus MCM erscheinen auch unter{" "}
-          <button className="text-accent hover:underline" onClick={() => setPage("keybinds")}>Tastenbelegung</button>.
+          {t("Tipp: Tasten aus MCM erscheinen auch unter")}{" "}
+          <button className="text-accent hover:underline" onClick={() => setPage("keybinds")}>{t("Tastenbelegung")}</button>.
         </p>
       </div>
       {keyLeaf && (

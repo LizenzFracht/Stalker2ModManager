@@ -1,6 +1,8 @@
 //! "Vanilla herstellen": brings the game back to an unmodded state. Nothing is deleted –
 //! everything that is not part of the game is moved into a dated quarantine folder.
 
+use crate::tr;
+
 use crate::game::GameInfo;
 use crate::model::Deployment;
 use anyhow::{Context, Result};
@@ -128,14 +130,14 @@ fn reset_engine_ini(dir: &Path, q: &mut Quarantine, label: &str) -> Result<bool>
     }
     q.used = true;
     crate::tweaks::set_readonly(&ini, false)?;
-    std::fs::write(&ini, out.join("\r\n") + "\r\n").context("Engine.ini zurücksetzen")?;
+    std::fs::write(&ini, out.join("\r\n") + "\r\n").context(tr!("Engine.ini zurücksetzen", "Resetting Engine.ini"))?;
     Ok(true)
 }
 
 /// Every Engine.ini location the game may use.
 pub fn config_dirs(extra: Option<&Path>) -> Vec<PathBuf> {
     let mut dirs: Vec<PathBuf> = Vec::new();
-    if let Ok(local) = std::env::var("LOCALAPPDATA") {
+    if let Some(local) = crate::game::local_appdata() {
         for p in ["Windows", "WinGDK"] {
             dirs.push(PathBuf::from(&local).join("Stalker2/Saved/Config").join(p));
         }
@@ -156,7 +158,7 @@ pub fn restore(
     config: &[PathBuf],
 ) -> Result<VanillaReport> {
     if !cfg!(test) && crate::game::is_running() {
-        anyhow::bail!("Stalker 2 läuft gerade. Bitte das Spiel schließen und erneut versuchen.");
+        anyhow::bail!(tr!("Stalker 2 läuft gerade. Bitte das Spiel schließen und erneut versuchen.", "Stalker 2 is running. Please close the game and try again."));
     }
     let mut report = VanillaReport::default();
     report.removed_deployed = crate::deploy::purge(game, deployment)?;
@@ -165,13 +167,13 @@ pub fn restore(
     let mut q = Quarantine { dir: quarantine_root.join(stamp), used: false };
     if opts.ue4ss {
         for rel in ue4ss_paths(game) {
-            q.take(&game.abs(&rel), &rel).with_context(|| format!("{rel} verschieben"))?;
+            q.take(&game.abs(&rel), &rel).with_context(|| tr!("{rel} verschieben", "Moving {rel}", rel = rel))?;
             report.moved.push(rel);
         }
     }
     if opts.foreign_mods {
         for rel in foreign_mod_paths(game) {
-            q.take(&game.abs(&rel), &rel).with_context(|| format!("{rel} verschieben"))?;
+            q.take(&game.abs(&rel), &rel).with_context(|| tr!("{rel} verschieben", "Moving {rel}", rel = rel))?;
             report.moved.push(rel);
         }
     }

@@ -57,6 +57,16 @@ pub struct Settings {
     pub map_port: u16,
     /// The welcome dialog (offering a vanilla reset) was shown.
     pub first_run_done: bool,
+    /// Keep Engine.ini read-only so the game does not overwrite the tweaks on exit.
+    #[serde(default = "yes")]
+    pub protect_engine_ini: bool,
+    /// "auto" (system language), "de" or "en".
+    #[serde(default = "auto_language")]
+    pub language: String,
+}
+
+fn auto_language() -> String {
+    "auto".into()
 }
 
 fn default_map_port() -> u16 {
@@ -82,6 +92,8 @@ impl Default for Settings {
             livemap_mod_id: None,
             map_port: default_map_port(),
             first_run_done: false,
+            language: auto_language(),
+            protect_engine_ini: true,
         }
     }
 }

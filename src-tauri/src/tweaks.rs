@@ -1,6 +1,8 @@
 //! Engine.ini [SystemSettings] tweaks. The original file is backed up once before the
 //! first change and can be restored at any time.
 
+use crate::tr;
+
 use anyhow::{Context, Result};
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -70,13 +72,14 @@ pub fn read(dir: Option<&Path>) -> TweakState {
     }
 }
 
-/// Sets (Some) or removes (None) keys in [SystemSettings].
-pub fn write(dir: &Path, changes: &BTreeMap<String, Option<String>>) -> Result<()> {
+/// Sets (Some) or removes (None) keys in [SystemSettings]; `protect` leaves the file
+/// read-only afterwards so the game cannot overwrite it on exit.
+pub fn write(dir: &Path, changes: &BTreeMap<String, Option<String>>, protect: bool) -> Result<()> {
     std::fs::create_dir_all(dir)?;
     let ini = engine_ini(dir);
     let backup = dir.join(BACKUP);
     if ini.exists() && !backup.exists() {
-        std::fs::copy(&ini, &backup).context("Sicherung von Engine.ini anlegen")?;
+        std::fs::copy(&ini, &backup).context(tr!("Sicherung von Engine.ini anlegen", "Backing up Engine.ini"))?;
     }
     let mut lines = read_lines(&ini);
     let (start, mut end) = match section_bounds(&lines) {
@@ -111,14 +114,9 @@ pub fn write(dir: &Path, changes: &BTreeMap<String, Option<String>>) -> Result<(
             (None, None) => {}
         }
     }
-    let was_ro = std::fs::metadata(&ini).map(|m| m.permissions().readonly()).unwrap_or(false);
-    if was_ro {
-        set_readonly(&ini, false)?;
-    }
-    std::fs::write(&ini, lines.join("\r\n") + "\r\n").context("Engine.ini schreiben")?;
-    if was_ro {
-        set_readonly(&ini, true)?;
-    }
+    set_readonly(&ini, false)?;
+    std::fs::write(&ini, lines.join("\r\n") + "\r\n").context(tr!("Engine.ini schreiben", "Writing Engine.ini"))?;
+    set_readonly(&ini, protect)?;
     Ok(())
 }
 
@@ -135,9 +133,9 @@ pub fn set_readonly(p: &Path, ro: bool) -> Result<()> {
 pub fn export(dir: &Path, dest: &Path) -> Result<()> {
     let ini = engine_ini(dir);
     if !ini.exists() {
-        anyhow::bail!("Engine.ini existiert noch nicht");
+        anyhow::bail!(tr!("Engine.ini existiert noch nicht", "Engine.ini does not exist yet"));
     }
-    std::fs::copy(&ini, dest).context("Engine.ini exportieren")?;
+    std::fs::copy(&ini, dest).context(tr!("Engine.ini exportieren", "Exporting Engine.ini"))?;
     Ok(())
 }
 
@@ -162,19 +160,18 @@ fn parse_ini(lines: &[String]) -> Vec<(String, String, String)> {
 
 /// Imports an ini file. `replace` overwrites Engine.ini; otherwise every key of every
 /// section is merged in (array entries starting with + - . are appended once).
-pub fn import(dir: &Path, src: &Path, replace: bool) -> Result<usize> {
+pub fn import(dir: &Path, src: &Path, replace: bool, protect: bool) -> Result<usize> {
     let incoming = read_lines(src);
     let entries = parse_ini(&incoming);
     if entries.is_empty() {
-        anyhow::bail!("Die Datei enthält keine ini-Einträge");
+        anyhow::bail!(tr!("Die Datei enthält keine ini-Einträge", "The file contains no ini entries"));
     }
     std::fs::create_dir_all(dir)?;
     let ini = engine_ini(dir);
     let backup = dir.join(BACKUP);
     if ini.exists() && !backup.exists() {
-        std::fs::copy(&ini, &backup).context("Sicherung von Engine.ini anlegen")?;
+        std::fs::copy(&ini, &backup).context(tr!("Sicherung von Engine.ini anlegen", "Backing up Engine.ini"))?;
     }
-    let was_ro = std::fs::metadata(&ini).map(|m| m.permissions().readonly()).unwrap_or(false);
     set_readonly(&ini, false)?;
     if replace {
         std::fs::write(&ini, incoming.join("\r\n") + "\r\n")?;
@@ -214,16 +211,14 @@ pub fn import(dir: &Path, src: &Path, replace: bool) -> Result<usize> {
         }
         std::fs::write(&ini, lines.join("\r\n") + "\r\n")?;
     }
-    if was_ro {
-        set_readonly(&ini, true)?;
-    }
+    set_readonly(&ini, protect)?;
     Ok(entries.len())
 }
 
 pub fn restore(dir: &Path) -> Result<()> {
     let backup = dir.join(BACKUP);
     if !backup.exists() {
-        anyhow::bail!("Keine Sicherung vorhanden");
+        anyhow::bail!(tr!("Keine Sicherung vorhanden", "No backup available"));
     }
     let ini = engine_ini(dir);
     set_readonly(&ini, false)?;
@@ -244,7 +239,7 @@ mod tests {
         std::fs::write(dir.join("Engine.ini"), "[Core.System]\r\nPaths=../x\r\n\r\n[SystemSettings]\r\nr.FilmGrain=1\r\n").unwrap();
         let src = dir.join("guide.ini");
         std::fs::write(&src, "[SystemSettings]\nr.FilmGrain=0\nr.Tonemapper.Sharpen=0.5\n\n[/Script/Engine.RendererSettings]\nr.DefaultFeature.MotionBlur=False\n").unwrap();
-        assert_eq!(import(&dir, &src, false).unwrap(), 3);
+        assert_eq!(import(&dir, &src, false, false).unwrap(), 3);
         let text = std::fs::read_to_string(dir.join("Engine.ini")).unwrap();
         assert!(text.contains("Paths=../x"));
         assert!(text.contains("r.FilmGrain=0") && !text.contains("r.FilmGrain=1"));

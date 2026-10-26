@@ -1,5 +1,7 @@
 //! Game install detection, layout and launching.
 
+use crate::tr;
+
 use crate::model::{LaunchMethod, Platform, Settings};
 use crate::util::hidden_command;
 use anyhow::{bail, Result};
@@ -76,6 +78,9 @@ pub fn guess_platform(root: &Path) -> Platform {
 }
 
 pub fn inspect(root: &Path, settings: &Settings) -> GameInfo {
+    if let Ok(mut g) = GAME_ROOT.write() {
+        *g = Some(root.to_path_buf());
+    }
     let valid = root.join("Stalker2").join("Content").join("Paks").is_dir();
     let platform = match settings.platform {
         Platform::Unknown => guess_platform(root),
@@ -114,22 +119,37 @@ pub fn inspect(root: &Path, settings: &Settings) -> GameInfo {
     }
 }
 
+/// Game root of the last inspected install; on Linux it locates the Proton prefix.
+static GAME_ROOT: std::sync::RwLock<Option<PathBuf>> = std::sync::RwLock::new(None);
+
+/// The game's `%LOCALAPPDATA%` – on Windows the real one, on Linux the one inside the
+/// Proton prefix (`steamapps/compatdata/1643320/pfx/drive_c/users/steamuser/AppData/Local`).
+pub fn local_appdata() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        std::env::var("LOCALAPPDATA").ok().map(PathBuf::from)
+    }
+    #[cfg(not(windows))]
+    {
+        let root = GAME_ROOT.read().ok()?.clone()?;
+        let steamapps = root.parent()?.parent()?;
+        let p = steamapps
+            .join("compatdata")
+            .join(STEAM_APP_ID)
+            .join("pfx/drive_c/users/steamuser/AppData/Local");
+        p.is_dir().then_some(p)
+    }
+}
+
 /// `%LOCALAPPDATA%\Stalker2\Saved\Config\Windows` (Steam/GOG) or `...\WinGDK` (Game Pass).
 pub fn config_dir(platform: Platform, settings: &Settings) -> Option<PathBuf> {
     if let Some(dir) = settings.config_dir.as_ref().filter(|s| !s.is_empty()) {
         return Some(PathBuf::from(dir));
     }
-    let base = PathBuf::from(std::env::var("LOCALAPPDATA").ok()?).join("Stalker2/Saved/Config");
-    let (first, second) = if platform == Platform::GamePass {
-        ("WinGDK", "Windows")
-    } else {
-        ("Windows", "WinGDK")
-    };
-    if base.join(first).is_dir() || !base.join(second).is_dir() {
-        Some(base.join(first))
-    } else {
-        Some(base.join(second))
-    }
+    // Strictly by platform: an old Game Pass "WinGDK" folder next to a Steam install must
+    // not catch the tweaks (the Steam build only reads "Windows").
+    let base = local_appdata()?.join("Stalker2/Saved/Config");
+    Some(base.join(if platform == Platform::GamePass { "WinGDK" } else { "Windows" }))
 }
 
 /// Steam build id from the app manifest; used to notice game patches.
@@ -158,9 +178,10 @@ fn vdf_values(text: &str, key: &str) -> Vec<String> {
 pub fn detect_installs() -> Vec<DetectedInstall> {
     let mut found: Vec<DetectedInstall> = Vec::new();
     let mut push = |p: PathBuf, platform: Platform| {
-        if let Some(root) = normalize_root(&PathBuf::from(p.to_string_lossy().replace('/', "\\"))) {
+        let p = if cfg!(windows) { PathBuf::from(p.to_string_lossy().replace('/', "\\")) } else { p };
+        if let Some(root) = normalize_root(&p) {
             let s = root.to_string_lossy().into_owned();
-            if !found.iter().any(|f| f.path.eq_ignore_ascii_case(&s)) {
+            if !found.iter().any(|f| if cfg!(windows) { f.path.eq_ignore_ascii_case(&s) } else { f.path == s }) {
                 found.push(DetectedInstall { path: s, platform });
             }
         }
@@ -172,6 +193,7 @@ pub fn detect_installs() -> Vec<DetectedInstall> {
     }
 
     // Game Pass: <drive>:\XboxGames\S.T.A.L.K.E.R. 2...\Content
+    #[cfg(windows)]
     for letter in b'C'..=b'Z' {
         let xbox = PathBuf::from(format!("{}:\\XboxGames", letter as char));
         if let Ok(rd) = std::fs::read_dir(&xbox) {
@@ -204,6 +226,7 @@ pub fn detect_installs() -> Vec<DetectedInstall> {
     }
 
     // Epic
+    #[cfg(windows)]
     if let Ok(rd) = std::fs::read_dir("C:\\ProgramData\\Epic\\EpicGamesLauncher\\Data\\Manifests") {
         for e in rd.flatten() {
             if let Ok(text) = std::fs::read_to_string(e.path()) {
@@ -234,7 +257,14 @@ fn steam_libraries() -> Vec<PathBuf> {
             }
         }
     }
+    #[cfg(windows)]
     roots.push(PathBuf::from("C:\\Program Files (x86)\\Steam"));
+    #[cfg(not(windows))]
+    if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+        for rel in [".steam/steam", ".local/share/Steam", ".var/app/com.valvesoftware.Steam/data/Steam", ".steam/root"] {
+            roots.push(home.join(rel));
+        }
+    }
     let mut libs = Vec::new();
     for root in roots {
         if let Ok(text) = std::fs::read_to_string(root.join("steamapps/libraryfolders.vdf")) {
@@ -242,10 +272,12 @@ fn steam_libraries() -> Vec<PathBuf> {
         }
         libs.push(root);
     }
+    libs.sort();
     libs.dedup();
     libs
 }
 
+#[cfg(windows)]
 pub fn is_running() -> bool {
     let Ok(out) = hidden_command("tasklist").args(["/FO", "CSV", "/NH"]).output() else {
         return false;
@@ -254,22 +286,44 @@ pub fn is_running() -> bool {
     SHIPPING_EXES.iter().any(|e| text.contains(&e.to_lowercase()))
 }
 
+/// Under Proton the game shows up as a process whose command line names the exe.
+#[cfg(not(windows))]
+pub fn is_running() -> bool {
+    let Ok(rd) = std::fs::read_dir("/proc") else { return false };
+    rd.flatten().any(|e| {
+        std::fs::read(e.path().join("cmdline"))
+            .map(|c| {
+                let c = String::from_utf8_lossy(&c).to_lowercase();
+                SHIPPING_EXES.iter().any(|x| c.contains(&x.to_lowercase()))
+            })
+            .unwrap_or(false)
+    })
+}
+
+/// Opens a URL with the system handler (used for steam:// links).
+fn open_url(url: &str) -> Result<()> {
+    #[cfg(windows)]
+    hidden_command("cmd").args(["/C", "start", "", url]).spawn()?;
+    #[cfg(not(windows))]
+    std::process::Command::new("xdg-open").arg(url).spawn()?;
+    Ok(())
+}
+
 pub fn launch(game: &GameInfo, settings: &Settings) -> Result<()> {
     let use_steam = match settings.launch_method {
         LaunchMethod::Steam => true,
         LaunchMethod::Direct => false,
-        LaunchMethod::Auto => game.platform == Platform::Steam,
+        LaunchMethod::Auto => game.platform == Platform::Steam || !cfg!(windows),
     };
     if use_steam {
         let mut url = format!("steam://rungameid/{STEAM_APP_ID}");
         if !settings.launch_args.trim().is_empty() {
             url = format!("steam://run/{STEAM_APP_ID}//{}/", settings.launch_args.trim());
         }
-        hidden_command("cmd").args(["/C", "start", "", &url]).spawn()?;
-        return Ok(());
+        return open_url(&url);
     }
     let Some(exe) = &game.exe else {
-        bail!("Keine Spiel-EXE gefunden. Bitte Startmethode „Steam“ wählen oder den Spielordner prüfen.");
+        bail!(tr!("Keine Spiel-EXE gefunden. Bitte Startmethode „Steam“ wählen oder den Spielordner prüfen.", "No game executable found. Choose the “Steam” launch method or check the game folder."));
     };
     let mut cmd = std::process::Command::new(exe);
     cmd.current_dir(Path::new(exe).parent().unwrap_or(Path::new(".")));

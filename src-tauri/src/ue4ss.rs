@@ -1,6 +1,8 @@
 //! Downloads UE4SS (experimental build) plus the Stalker 2 game config from GitHub and
 //! prepares a folder that is installed like any other mod.
 
+use crate::tr;
+
 use crate::model::Platform;
 use anyhow::{anyhow, Context, Result};
 use futures_util::StreamExt;
@@ -19,7 +21,7 @@ async fn download(client: &reqwest::Client, url: &str, dest: &Path) -> Result<()
     let mut file = tokio::fs::File::create(dest).await?;
     let mut stream = resp.bytes_stream();
     while let Some(chunk) = stream.next().await {
-        file.write_all(&chunk.context("Download abgebrochen")?).await?;
+        file.write_all(&chunk.context(tr!("Download abgebrochen", "Download interrupted"))?).await?;
     }
     file.flush().await?;
     Ok(())
@@ -32,11 +34,11 @@ pub async fn prepare(work: &Path, platform: Platform) -> Result<Prepared> {
         .get(RELEASE_API)
         .send()
         .await
-        .context("GitHub nicht erreichbar")?
+        .context(tr!("GitHub nicht erreichbar", "GitHub not reachable"))?
         .error_for_status()?
         .json()
         .await?;
-    let assets = release["assets"].as_array().ok_or_else(|| anyhow!("Keine UE4SS-Dateien im Release gefunden"))?;
+    let assets = release["assets"].as_array().ok_or_else(|| anyhow!(tr!("Keine UE4SS-Dateien im Release gefunden", "No UE4SS files found in the release")))?;
     let find = |pred: &dyn Fn(&str) -> bool| {
         assets.iter().find_map(|a| {
             let name = a["name"].as_str()?;
@@ -44,7 +46,7 @@ pub async fn prepare(work: &Path, platform: Platform) -> Result<Prepared> {
         })
     };
     let (main_name, main_url) =
-        find(&|n| n.starts_with("UE4SS_") && n.ends_with(".zip")).ok_or_else(|| anyhow!("UE4SS-Archiv nicht gefunden"))?;
+        find(&|n| n.starts_with("UE4SS_") && n.ends_with(".zip")).ok_or_else(|| anyhow!(tr!("UE4SS-Archiv nicht gefunden", "UE4SS archive not found")))?;
     let configs = find(&|n| n == "zCustomGameConfigs.zip");
 
     let _ = std::fs::remove_dir_all(work);
@@ -77,4 +79,45 @@ pub async fn prepare(work: &Path, platform: Platform) -> Result<Prepared> {
     })
     .await
     .map_err(|e| anyhow!("{e}"))?
+}
+
+#[derive(serde::Serialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LogStatus {
+    /// ok | failed | unknown (no log yet)
+    pub state: String,
+    /// The fatal error line(s) when UE4SS could not start.
+    pub detail: Option<String>,
+    pub log_path: Option<String>,
+    pub log_time: u64,
+}
+
+/// Reads UE4SS.log of the last game start and tells whether UE4SS initialised.
+pub fn log_status(game: &crate::game::GameInfo) -> LogStatus {
+    let bin = game.abs(&game.binaries_dir);
+    let Some(log) = [bin.join("ue4ss/UE4SS.log"), bin.join("UE4SS.log")].into_iter().find(|p| p.is_file()) else {
+        return LogStatus { state: "unknown".into(), ..Default::default() };
+    };
+    let (size, mtime) = crate::util::file_meta(&log);
+    let mut text = String::new();
+    if let Ok(mut f) = std::fs::File::open(&log) {
+        use std::io::{Read, Seek, SeekFrom};
+        let start = size.saturating_sub(256 * 1024);
+        let _ = f.seek(SeekFrom::Start(start));
+        let mut buf = Vec::new();
+        let _ = f.read_to_end(&mut buf);
+        text = String::from_utf8_lossy(&buf).into_owned();
+    }
+    let lines: Vec<&str> = text.lines().collect();
+    let fatal = lines.iter().rposition(|l| l.contains("Fatal Error"));
+    let state = if fatal.is_some() { "failed" } else { "ok" };
+    let detail = fatal.map(|i| {
+        lines[i..lines.len().min(i + 4)]
+            .iter()
+            .map(|l| l.trim().trim_start_matches(|c: char| c == '[' || c.is_ascii_digit() || " -:.]".contains(c)).to_string())
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+            .join("\n")
+    });
+    LogStatus { state: state.into(), detail, log_path: Some(log.to_string_lossy().into_owned()), log_time: mtime }
 }

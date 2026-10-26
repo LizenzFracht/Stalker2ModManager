@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { Button, Modal } from "../components/ui";
 import type { SortEntry } from "../types";
+import { t } from "../i18n";
 
 export function AutosortDialog({ onClose }: { onClose: () => void }) {
   const { state, run, setState, toast } = useStore();
@@ -23,35 +24,33 @@ export function AutosortDialog({ onClose }: { onClose: () => void }) {
     const s = await run(() => api.reorderMods(entries.map((e) => e.id)));
     if (s) {
       setState(s);
-      toast("success", "Reihenfolge übernommen – zum Aktivieren „Anwenden“ klicken.");
+      toast("success", t("Reihenfolge übernommen – zum Aktivieren „Anwenden“ klicken."));
       onClose();
     }
   };
 
   return (
     <Modal
-      title="Automatisch sortieren"
+      title={t("Automatisch sortieren")}
       onClose={onClose}
       width="max-w-2xl"
       footer={
         <>
           <span className="mr-auto self-center text-xs text-muted">
-            {entries ? (changed ? `${changed} Mod(s) werden verschoben` : "Die Reihenfolge ist bereits optimal") : ""}
+            {entries ? (changed ? t("{n} Mod(s) werden verschoben", { n: changed }) : t("Die Reihenfolge ist bereits optimal")) : ""}
           </span>
-          <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
+          <Button variant="ghost" onClick={onClose}>{t("Abbrechen")}</Button>
           <Button variant="primary" icon={<Wand2 size={15} />} disabled={!changed} onClick={accept}>
-            Übernehmen
+            {t("Übernehmen")}
           </Button>
         </>
       }
     >
       <p className="text-[13px] leading-relaxed text-muted">
-        Grundlagen (UE4SS, MCM, Frameworks) zuerst, dann Skript-Mods, dann Pak-Mods – große Überarbeitungen vor kleinen, gezielten
-        Änderungen, damit diese gewinnen. Patches und Kompatibilitäts-Mods kommen ans Ende bzw. direkt hinter die Mod, die sie
-        betreffen.
+        {t("Grundlagen (UE4SS, MCM, Frameworks) zuerst, dann Skript-Mods, dann Pak-Mods – große Überarbeitungen vor kleinen, gezielten Änderungen, damit diese gewinnen. Patches und Kompatibilitäts-Mods kommen ans Ende bzw. direkt hinter die Mod, die sie betreffen.")}
       </p>
       {!entries ? (
-        <p className="mt-4 text-sm text-muted">Analysiere Mods …</p>
+        <p className="mt-4 text-sm text-muted">{t("Analysiere Mods …")}</p>
       ) : (
         <ol className="mt-4 divide-y divide-line rounded-lg border border-line">
           {entries.map((e) => {

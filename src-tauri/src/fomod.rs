@@ -1,6 +1,8 @@
 //! FOMOD installer support (fomod/ModuleConfig.xml): install steps, option groups,
 //! plugin images/descriptions and flag-based conditional installs.
 
+use crate::tr;
+
 use crate::model::{Conditional, FileMap, GroupKind, ModLayout, ModOption, OptionGroup};
 use anyhow::{Context, Result};
 use roxmltree::{Document, Node};
@@ -112,7 +114,7 @@ pub fn parse(xml_path: &Path) -> Result<Fomod> {
         &text,
         roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() },
     )
-    .context("FOMOD ModuleConfig.xml ist ungültig")?;
+    .context(tr!("FOMOD ModuleConfig.xml ist ungültig", "FOMOD ModuleConfig.xml is invalid"))?;
     let root = doc.root_element();
 
     let mut layout = ModLayout { fomod: true, ..Default::default() };

@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api, errorText } from "./api";
+import { invoke } from "@tauri-apps/api/core";
+import { getLang, resolveLang, setLang, type Lang } from "./i18n";
 import type { AppState, Download } from "./types";
 
 export type Page = "mods" | "conflicts" | "tweaks" | "keybinds" | "mcm" | "livemap" | "downloads" | "settings";
@@ -61,13 +63,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [dismissToast],
   );
 
+  const [lang, setLangState] = useState<Lang>(getLang());
+
+  // Every state update passes through here so a language change applies at once.
+  const applyState = useCallback((s: AppState) => {
+    const l = resolveLang(s.settings.language);
+    if (l !== getLang() || !document.documentElement.lang) {
+      setLang(l);
+      setLangState(l);
+      invoke("set_language", { lang: l }).catch(() => {});
+    }
+    setState(s);
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
-      setState(await api.getState());
+      applyState(await api.getState());
     } catch (e) {
       toast("error", errorText(e));
     }
-  }, [toast]);
+  }, [toast, applyState]);
 
   const run = useCallback(
     async <T,>(fn: () => Promise<T>, opts: RunOptions = {}) => {
@@ -102,7 +117,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       state,
-      setState,
+      setState: applyState,
       refresh,
       run,
       busy,
@@ -119,13 +134,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       mcmFilter,
       setMcmFilter,
     }),
-    [state, refresh, run, busy, toasts, toast, dismissToast, downloads, page, selectedMod, optionsFor, mcmFilter],
+    // `lang` re-renders every consumer when the language changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state, applyState, refresh, run, busy, toasts, toast, dismissToast, downloads, page, selectedMod, optionsFor, mcmFilter, lang],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
 export function useStore() {
   const s = useContext(Ctx);
-  if (!s) throw new Error("StoreProvider fehlt");
+  if (!s) throw new Error("StoreProvider missing");
   return s;
 }

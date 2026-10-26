@@ -1,9 +1,10 @@
 import { useEffect, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { ask } from "@tauri-apps/plugin-dialog";
+import { locale, t } from "../i18n";
 
-export function confirmDialog(message: string, okLabel = "Ja") {
-  return ask(message, { title: "S2MM", kind: "warning", okLabel, cancelLabel: "Abbrechen" });
+export function confirmDialog(message: string, okLabel?: string) {
+  return ask(message, { title: "S2MM", kind: "warning", okLabel: okLabel ?? t("Ja"), cancelLabel: t("Abbrechen") });
 }
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
@@ -165,7 +166,7 @@ export function Modal({
       >
         <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <h2 className="font-display text-xl font-semibold tracking-wide">{title}</h2>
-          <IconButton label="Schließen" onClick={onClose}>
+          <IconButton label={t("Schließen")} onClick={onClose}>
             <X size={18} />
           </IconButton>
         </div>
@@ -211,7 +212,7 @@ export function formatBytes(n: number) {
 
 export function formatDate(secs: number) {
   if (!secs) return "–";
-  return new Date(secs * 1000).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+  return new Date(secs * 1000).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" });
 }
 
 export const platformLabel: Record<string, string> = {
@@ -222,6 +223,7 @@ export const platformLabel: Record<string, string> = {
   unknown: "Unbekannt",
 };
 
+/** Labels are German source strings – render them through t(). */
 export const kindLabel: Record<string, { label: string; title: string }> = {
   pak: { label: "PAK", title: "Pak-Mod (~mods-Ordner)" },
   zoneKit: { label: "Zone Kit", title: "Offizielles Mod-Format (Stalker2\\Mods)" },

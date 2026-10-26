@@ -26,24 +26,44 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPDATA/**", "**/S2MM-Daten/**"]
+        "scope": [
+          "$APPDATA/**",
+          "**/S2MM-Daten/**",
+          "**/S2MM-Data/**"
+        ]
       }
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "shortDescription": "Mod Manager für S.T.A.L.K.E.R. 2",
+    "shortDescription": "Mod manager for S.T.A.L.K.E.R. 2: Heart of Chornobyl",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["German", "English"]
+        "languages": [
+          "English",
+          "German"
+        ]
+      }
+    },
+    "publisher": "S2MM contributors",
+    "copyright": "MIT License – S2MM contributors",
+    "homepage": "https://github.com/LizenzFracht/Stalker2ModManager",
+    "category": "Game",
+    "longDescription": "Install, sort and conflict-check mods for S.T.A.L.K.E.R. 2, edit MCM settings and key bindings, tweak Engine.ini and follow your position on a live map. Unofficial fan project, not affiliated with GSC Game World.",
+    "licenseFile": "../LICENSE",
+    "linux": {
+      "deb": {
+        "section": "games"
       }
     }
   }

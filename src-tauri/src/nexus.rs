@@ -1,5 +1,7 @@
 //! Nexus Mods API v1 client, nxm:// link handling and protocol registration.
 
+use crate::tr;
+
 use anyhow::{anyhow, bail, Context, Result};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
@@ -7,6 +9,10 @@ use std::path::Path;
 use tokio::io::AsyncWriteExt;
 
 const API: &str = "https://api.nexusmods.com/v1";
+
+/// Compiled with the Nexus Mods API (cargo feature `nexus`).
+pub const ENABLED: bool = cfg!(feature = "nexus");
+
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -85,16 +91,16 @@ pub fn parse_nxm(url: &str) -> Result<NxmLink> {
     let rest = url
         .trim()
         .strip_prefix("nxm://")
-        .ok_or_else(|| anyhow!("Kein nxm://-Link"))?;
+        .ok_or_else(|| anyhow!(tr!("Kein nxm://-Link", "Not an nxm:// link")))?;
     let (path, query) = rest.split_once('?').unwrap_or((rest, ""));
     let parts: Vec<&str> = path.trim_end_matches('/').split('/').collect();
     if parts.len() < 5 || !parts[1].eq_ignore_ascii_case("mods") || !parts[3].eq_ignore_ascii_case("files") {
-        bail!("Ungültiger nxm-Link: {url}");
+        bail!(tr!("Ungültiger nxm-Link: {url}", "Invalid nxm link: {url}", url = url));
     }
     let mut link = NxmLink {
         game: parts[0].to_lowercase(),
-        mod_id: parts[2].parse().context("Ungültige Mod-ID")?,
-        file_id: parts[4].parse().context("Ungültige Datei-ID")?,
+        mod_id: parts[2].parse().context(tr!("Ungültige Mod-ID", "Invalid mod ID"))?,
+        file_id: parts[4].parse().context(tr!("Ungültige Datei-ID", "Invalid file ID"))?,
         key: None,
         expires: None,
     };
@@ -117,8 +123,11 @@ pub struct Client {
 
 impl Client {
     pub fn new(key: &str) -> Result<Self> {
+        if !ENABLED {
+            bail!(tr!("Die Nexus-Mods-Anbindung ist in dieser Version deaktiviert.", "Nexus Mods integration is disabled in this version."));
+        }
         if key.trim().is_empty() {
-            bail!("Kein Nexus-API-Schlüssel hinterlegt (Einstellungen → Nexus Mods).");
+            bail!(tr!("Kein Nexus-API-Schlüssel hinterlegt (Einstellungen → Nexus Mods).", "No Nexus API key set (Settings → Nexus Mods)."));
         }
         let http = reqwest::Client::builder()
             .user_agent(concat!("S2MM/", env!("CARGO_PKG_VERSION")))
@@ -135,7 +144,7 @@ impl Client {
             .header("Application-Version", env!("CARGO_PKG_VERSION"))
             .send()
             .await
-            .context("Nexus Mods nicht erreichbar")?;
+            .context(tr!("Nexus Mods nicht erreichbar", "Nexus Mods not reachable"))?;
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
@@ -144,14 +153,14 @@ impl Client {
                 .and_then(|v| v["message"].as_str().map(|s| s.to_string()))
                 .unwrap_or(body);
             match status.as_u16() {
-                401 => bail!("Nexus-API-Schlüssel ungültig: {msg}"),
-                403 => bail!("Nexus verweigert den Zugriff: {msg}"),
-                404 => bail!("Nicht auf Nexus gefunden: {msg}"),
-                429 => bail!("Nexus-Anfragelimit erreicht, bitte später erneut versuchen."),
-                _ => bail!("Nexus-Fehler {status}: {msg}"),
+                401 => bail!(tr!("Nexus-API-Schlüssel ungültig: {msg}", "Invalid Nexus API key: {msg}", msg = msg)),
+                403 => bail!(tr!("Nexus verweigert den Zugriff: {msg}", "Nexus denied access: {msg}", msg = msg)),
+                404 => bail!(tr!("Nicht auf Nexus gefunden: {msg}", "Not found on Nexus: {msg}", msg = msg)),
+                429 => bail!(tr!("Nexus-Anfragelimit erreicht, bitte später erneut versuchen.", "Nexus rate limit reached, please try again later.")),
+                _ => bail!(tr!("Nexus-Fehler {status}: {msg}", "Nexus error {status}: {msg}", status = status, msg = msg)),
             }
         }
-        Ok(resp.json().await.context("Antwort von Nexus nicht lesbar")?)
+        Ok(resp.json().await.context(tr!("Antwort von Nexus nicht lesbar", "Cannot read the Nexus response"))?)
     }
 
     pub async fn validate(&self) -> Result<NexusUser> {
@@ -182,7 +191,7 @@ impl Client {
         }
         let links: Vec<serde_json::Value> = self.get(&path).await.map_err(|e| {
             if key.is_none() {
-                anyhow!("{e:#}\nDirekte Downloads sind nur mit Nexus Premium möglich – nutze den Button „Mod Manager Download“ auf der Nexus-Seite.")
+                anyhow!(tr!("{e:#}\nDirekte Downloads sind nur mit Nexus Premium möglich – nutze den Button „Mod Manager Download“ auf der Nexus-Seite.", "{e:#}\nDirect downloads require Nexus Premium – use the “Mod Manager Download” button on the Nexus page.", e = e))
             } else {
                 e
             }
@@ -191,7 +200,7 @@ impl Client {
             .iter()
             .find_map(|l| l["URI"].as_str())
             .map(|s| s.to_string())
-            .ok_or_else(|| anyhow!("Nexus hat keinen Download-Link geliefert"))
+            .ok_or_else(|| anyhow!(tr!("Nexus hat keinen Download-Link geliefert", "Nexus did not return a download link")))
     }
 
     /// Streams `url` into `dest`, reporting (received, total).
@@ -204,7 +213,7 @@ impl Client {
         let mut stream = resp.bytes_stream();
         let mut last = 0u64;
         while let Some(chunk) = stream.next().await {
-            let chunk = chunk.context("Download abgebrochen")?;
+            let chunk = chunk.context(tr!("Download abgebrochen", "Download interrupted"))?;
             file.write_all(&chunk).await?;
             received += chunk.len() as u64;
             if received - last > 512 * 1024 {
@@ -245,6 +254,9 @@ pub fn file_name_from_url(url: &str) -> Option<String> {
 #[cfg(windows)]
 pub fn set_protocol_handler(enable: bool, previous: Option<&str>) -> Result<Option<String>> {
     use winreg::enums::*;
+    if enable && !ENABLED {
+        bail!(tr!("Die Nexus-Mods-Anbindung ist in dieser Version deaktiviert.", "Nexus Mods integration is disabled in this version."));
+    }
     use winreg::RegKey;
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let exe = std::env::current_exe()?.to_string_lossy().into_owned();
@@ -280,7 +292,7 @@ pub fn set_protocol_handler(enable: bool, previous: Option<&str>) -> Result<Opti
 
 #[cfg(not(windows))]
 pub fn set_protocol_handler(_enable: bool, _previous: Option<&str>) -> Result<Option<String>> {
-    bail!("nxm-Links werden nur unter Windows unterstützt")
+    bail!(tr!("nxm-Links werden nur unter Windows unterstützt", "nxm links are only supported on Windows"))
 }
 
 #[cfg(test)]

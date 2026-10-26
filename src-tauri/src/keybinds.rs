@@ -1,6 +1,8 @@
 //! Finds key bindings declared by mods (UE4SS Lua `RegisterKeyBind`, `Key.X` config
 //! assignments, hotkey entries in ini/json/lua configs) and rewrites them on rebind.
 
+use crate::tr;
+
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -125,7 +127,7 @@ pub fn scan_file(text: &str, rel: &str, mod_id: &str, mod_name: &str, enabled: b
                     } else if !pending_comment.is_empty() {
                         pending_comment.clone()
                     } else {
-                        format!("Zeile {}", i + 1)
+                        tr!("Zeile {}", "Line {}", i + 1)
                     };
                     push("ue4ss", action, key, mods, "ue4ss");
                 }
@@ -176,17 +178,17 @@ pub fn scan_file(text: &str, rel: &str, mod_id: &str, mod_name: &str, enabled: b
 pub fn rebind(path: &Path, b: &Binding, key: &str, modifiers: &[String]) -> Result<()> {
     let ok_key = key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !key.is_empty();
     if !ok_key {
-        bail!("Ungültiger Tastenname: {key}");
+        bail!(tr!("Ungültiger Tastenname: {key}", "Invalid key name: {key}", key = key));
     }
     let text = std::fs::read_to_string(path)?;
     let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
     let mut lines: Vec<String> = text.lines().map(|l| l.to_string()).collect();
-    let line = lines.get_mut(b.line - 1).ok_or_else(|| anyhow!("Zeile {} nicht gefunden", b.line))?;
+    let line = lines.get_mut(b.line - 1).ok_or_else(|| anyhow!(tr!("Zeile {} nicht gefunden", "Line {} not found", b.line)))?;
     match (b.source.as_str(), b.style.as_str()) {
         ("ue4ss", _) => {
-            let start = line.find("RegisterKeyBind(").ok_or_else(|| anyhow!("Datei wurde verändert"))? + "RegisterKeyBind(".len();
+            let start = line.find("RegisterKeyBind(").ok_or_else(|| anyhow!(tr!("Datei wurde verändert", "The file was changed")))? + "RegisterKeyBind(".len();
             let rest = &line[start..];
-            let key_start = start + rest.find("Key.").ok_or_else(|| anyhow!("Datei wurde verändert"))?;
+            let key_start = start + rest.find("Key.").ok_or_else(|| anyhow!(tr!("Datei wurde verändert", "The file was changed")))?;
             let after_key = key_start + 4 + ident_at(&line[key_start + 4..]).len();
             // Drop an existing modifier table directly after the key.
             let tail = &line[after_key..];
@@ -195,7 +197,7 @@ pub fn rebind(path: &Path, b: &Binding, key: &str, modifiers: &[String]) -> Resu
             if let Some(r) = trimmed.strip_prefix(',') {
                 if r.trim_start().starts_with('{') {
                     let brace = after_key + (tail.len() - trimmed.len()) + 1 + (r.len() - r.trim_start().len());
-                    let close = line[brace..].find('}').ok_or_else(|| anyhow!("Datei wurde verändert"))?;
+                    let close = line[brace..].find('}').ok_or_else(|| anyhow!(tr!("Datei wurde verändert", "The file was changed")))?;
                     tail_start = brace + close + 1;
                 }
             }
@@ -207,14 +209,14 @@ pub fn rebind(path: &Path, b: &Binding, key: &str, modifiers: &[String]) -> Resu
             *line = format!("{}Key.{key}{mods}{}", &line[..key_start], &line[tail_start..]);
         }
         (_, "ue4ss") => {
-            let pos = line.find("Key.").ok_or_else(|| anyhow!("Datei wurde verändert"))?;
+            let pos = line.find("Key.").ok_or_else(|| anyhow!(tr!("Datei wurde verändert", "The file was changed")))?;
             let end = pos + 4 + ident_at(&line[pos + 4..]).len();
             *line = format!("{}Key.{key}{}", &line[..pos], &line[end..]);
         }
         _ => {
             // Replace the old value after the separator.
-            let sep = line.find(['=', ':']).ok_or_else(|| anyhow!("Datei wurde verändert"))?;
-            let value_pos = line[sep..].find(&b.key).map(|p| p + sep).ok_or_else(|| anyhow!("Datei wurde verändert"))?;
+            let sep = line.find(['=', ':']).ok_or_else(|| anyhow!(tr!("Datei wurde verändert", "The file was changed")))?;
+            let value_pos = line[sep..].find(&b.key).map(|p| p + sep).ok_or_else(|| anyhow!(tr!("Datei wurde verändert", "The file was changed")))?;
             *line = format!("{}{key}{}", &line[..value_pos], &line[value_pos + b.key.len()..]);
         }
     }
@@ -225,10 +227,13 @@ pub fn rebind(path: &Path, b: &Binding, key: &str, modifiers: &[String]) -> Resu
 /// A small, conservative list of default game keys used for conflict hints.
 pub fn game_defaults() -> Vec<Binding> {
     [
-        ("Bewegen", "W"), ("Bewegen", "A"), ("Bewegen", "S"), ("Bewegen", "D"), ("Springen", "SPACE"),
-        ("Ducken", "C"), ("Sprinten", "LEFT_SHIFT"), ("Nachladen", "R"), ("PDA / Inventar", "TAB"),
-        ("Schnellspeichern", "F5"), ("Schnellladen", "F9"), ("Menü", "ESCAPE"), ("Waffe 1", "ONE"),
-        ("Waffe 2", "TWO"), ("Waffe 3", "THREE"), ("Waffe 4", "FOUR"),
+        (tr!("Bewegen", "Move"), "W"), (tr!("Bewegen", "Move"), "A"), (tr!("Bewegen", "Move"), "S"),
+        (tr!("Bewegen", "Move"), "D"), (tr!("Springen", "Jump"), "SPACE"), (tr!("Ducken", "Crouch"), "C"),
+        (tr!("Sprinten", "Sprint"), "LEFT_SHIFT"), (tr!("Nachladen", "Reload"), "R"),
+        (tr!("PDA / Inventar", "PDA / inventory"), "TAB"), (tr!("Schnellspeichern", "Quick save"), "F5"),
+        (tr!("Schnellladen", "Quick load"), "F9"), (tr!("Menü", "Menu"), "ESCAPE"),
+        (tr!("Waffe 1", "Weapon 1"), "ONE"), (tr!("Waffe 2", "Weapon 2"), "TWO"),
+        (tr!("Waffe 3", "Weapon 3"), "THREE"), (tr!("Waffe 4", "Weapon 4"), "FOUR"),
     ]
     .iter()
     .enumerate()
@@ -236,7 +241,7 @@ pub fn game_defaults() -> Vec<Binding> {
         id: format!("game:{i}"),
         source: "game".into(),
         mod_id: None,
-        mod_name: "Stalker 2 (Standard)".into(),
+        mod_name: tr!("Stalker 2 (Standard)", "Stalker 2 (default)"),
         enabled: true,
         file: None,
         line: 0,

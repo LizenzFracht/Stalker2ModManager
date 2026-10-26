@@ -1,10 +1,10 @@
 -- S2MM Live-Map
--- Schreibt einmal pro Sekunde die Spielerposition nach %LOCALAPPDATA%\S2MM\live.json.
+-- Schreibt einmal pro Sekunde die Spielerposition nach %LOCALAPPDATA%\S2MM-Live\live.json.
 -- Der Stalker 2 Mod Manager (S2MM) zeigt sie auf der interaktiven Karte im Browser an.
 
 local UEHelpers = require("UEHelpers")
 
-local dir = (os.getenv("LOCALAPPDATA") or ".") .. "\\S2MM"
+local dir = (os.getenv("LOCALAPPDATA") or ".") .. "\\S2MM-Live"
 local target = dir .. "\\live.json"
 local temp = dir .. "\\live.tmp"
 

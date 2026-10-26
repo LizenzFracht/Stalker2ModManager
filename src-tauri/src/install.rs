@@ -1,5 +1,7 @@
 //! Staging a mod: unpack it into the library, analyse it and produce a ModEntry.
 
+use crate::tr;
+
 use crate::archive;
 use crate::layout::{analyze, Analysis};
 use crate::model::{ModEntry, NexusRef};
@@ -60,10 +62,10 @@ fn ensure_ue4ss_enabled(files: &Path) {
 /// given the mod is replaced in place (update) and its option choices are carried over.
 pub fn stage(mods_root: &Path, src: &Path, meta: InstallMeta, existing: Option<&ModEntry>) -> Result<ModEntry> {
     if !src.exists() {
-        bail!("{} existiert nicht", src.display());
+        bail!(tr!("{} existiert nicht", "{} does not exist", src.display()));
     }
     if !archive::is_supported(src) {
-        bail!("{}: Format wird nicht unterstützt (erlaubt: zip, 7z, rar, pak/utoc/ucas, dll/asi, Ordner)", src.display());
+        bail!(tr!("{}: Format wird nicht unterstützt (erlaubt: zip, 7z, rar, pak/utoc/ucas, dll/asi, Ordner)", "{}: unsupported format (allowed: zip, 7z, rar, pak/utoc/ucas, dll/asi, folders)", src.display()));
     }
     let id = existing.map(|e| e.id.clone()).unwrap_or_else(|| uuid::Uuid::new_v4().simple().to_string());
     let tmp = mods_root.join(format!("{id}.new"));
@@ -77,7 +79,7 @@ pub fn stage(mods_root: &Path, src: &Path, meta: InstallMeta, existing: Option<&
     }
     if walkdir::WalkDir::new(&files).into_iter().flatten().all(|e| !e.file_type().is_file()) {
         let _ = std::fs::remove_dir_all(&tmp);
-        bail!("{} enthält keine Dateien", src.display());
+        bail!(tr!("{} enthält keine Dateien", "{} contains no files", src.display()));
     }
     ensure_ue4ss_enabled(&files);
 
@@ -131,7 +133,7 @@ pub fn stage(mods_root: &Path, src: &Path, meta: InstallMeta, existing: Option<&
         if old.exists() {
             std::fs::remove_dir_all(&old)?;
         }
-        std::fs::rename(&final_dir, &old).context("Alte Mod-Version verschieben (Dateien in Benutzung?)")?;
+        std::fs::rename(&final_dir, &old).context(tr!("Alte Mod-Version verschieben (Dateien in Benutzung?)", "Moving the old mod version (files in use?)"))?;
         std::fs::rename(&tmp, &final_dir)?;
         let _ = std::fs::remove_dir_all(&old);
     } else {

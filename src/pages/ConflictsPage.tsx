@@ -4,6 +4,7 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { Button, Empty, SectionTitle } from "../components/ui";
 import type { ConflictPair, ConflictReport } from "../types";
+import { t } from "../i18n";
 
 export function ConflictsPage() {
   const { state, run, setState, setPage, setSelectedMod } = useStore();
@@ -38,18 +39,16 @@ export function ConflictsPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-8 py-7">
-        <h1 className="font-display text-3xl font-semibold tracking-wide">Konflikte</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-wide">{t("Konflikte")}</h1>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-          S2MM liest das Inhaltsverzeichnis jeder aktiven .pak/.utoc-Datei. Ändern zwei Mods dieselbe Datei (z. B. dieselbe .cfg), gilt
-          nur die Version der Mod, die weiter unten in der Ladereihenfolge steht. Bei .cfg-Dateien heißt das meist: Die Änderungen der
-          oberen Mod sind komplett wirkungslos.
+          {t("S2MM liest das Inhaltsverzeichnis jeder aktiven .pak/.utoc-Datei. Ändern zwei Mods dieselbe Datei (z. B. dieselbe .cfg), gilt nur die Version der Mod, die weiter unten in der Ladereihenfolge steht. Bei .cfg-Dateien heißt das meist: Die Änderungen der oberen Mod sind komplett wirkungslos.")}
         </p>
 
         {report === null ? (
-          <p className="mt-8 text-sm text-muted">Analysiere Pak-Dateien …</p>
+          <p className="mt-8 text-sm text-muted">{t("Analysiere Pak-Dateien …")}</p>
         ) : pairs.length === 0 && report.errors.length === 0 ? (
-          <Empty icon={<ShieldCheck size={44} className="text-ok" />} title="Keine Konflikte">
-            Keine aktive Mod überschreibt Dateien einer anderen.
+          <Empty icon={<ShieldCheck size={44} className="text-ok" />} title={t("Keine Konflikte")}>
+            {t("Keine aktive Mod überschreibt Dateien einer anderen.")}
           </Empty>
         ) : (
           <>
@@ -57,7 +56,7 @@ export function ConflictsPage() {
               <div className="mt-6 flex items-center gap-2 text-sm">
                 <Swords size={16} className="text-accent" />
                 <span>
-                  {pairs.length} Überschneidung{pairs.length === 1 ? "" : "en"} zwischen {involved} Mods
+                  {pairs.length === 1 ? t("1 Überschneidung zwischen {m} Mods", { m: involved }) : t("{n} Überschneidungen zwischen {m} Mods", { n: pairs.length, m: involved })}
                 </span>
               </div>
             )}
@@ -71,7 +70,7 @@ export function ConflictsPage() {
                       <button
                         onClick={() => setExpanded(isOpen ? null : id)}
                         aria-expanded={isOpen}
-                        aria-label="Dateien anzeigen"
+                        aria-label={t("Dateien anzeigen")}
                         className="text-dim hover:text-text"
                       >
                         <ChevronRight size={16} className={`transition-transform ${isOpen ? "rotate-90" : ""}`} />
@@ -81,17 +80,17 @@ export function ConflictsPage() {
                           {nameOf(p.winner)}
                         </button>
                         <span className="font-mono text-[11px] text-dim"> #{prio(p.winner)}</span>
-                        <span className="text-muted"> überschreibt </span>
+                        <span className="text-muted"> {t("überschreibt")} </span>
                         <button onClick={() => open(p.loser)} className="font-medium text-danger hover:underline">
                           {nameOf(p.loser)}
                         </button>
                         <span className="font-mono text-[11px] text-dim"> #{prio(p.loser)}</span>
                         <div className="mt-0.5 text-xs text-dim">
-                          {p.count} {p.kind === "asset" ? (p.count === 1 ? "Datei in Paks" : "Dateien in Paks") : p.count === 1 ? "Datei im Spielordner" : "Dateien im Spielordner"}
+                          {p.kind === "asset" ? t("{n} Datei(en) in Paks", { n: p.count }) : t("{n} Datei(en) im Spielordner", { n: p.count })}
                         </div>
                       </div>
-                      <Button size="sm" variant="ghost" icon={<ArrowRightLeft size={14} />} onClick={() => swap(p)} title="Verlierer direkt unter den Gewinner schieben">
-                        Umkehren
+                      <Button size="sm" variant="ghost" icon={<ArrowRightLeft size={14} />} onClick={() => swap(p)} title={t("Verlierer direkt unter den Gewinner schieben")}>
+                        {t("Umkehren")}
                       </Button>
                     </div>
                     {isOpen && (
@@ -111,7 +110,7 @@ export function ConflictsPage() {
 
             {report.errors.length > 0 && (
               <div className="mt-10">
-                <SectionTitle>Nicht prüfbar</SectionTitle>
+                <SectionTitle>{t("Nicht prüfbar")}</SectionTitle>
                 <ul className="space-y-1.5">
                   {report.errors.map((e, i) => (
                     <li key={i} className="rounded-md border border-line bg-panel px-4 py-2.5 text-[13px]">

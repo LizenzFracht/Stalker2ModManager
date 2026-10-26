@@ -1,0 +1,103 @@
+[center][img]https://raw.githubusercontent.com/LizenzFracht/Stalker2ModManager/master/src-tauri/icons/128x128@2x.png[/img]
+
+[size=6][b]S2MM – Stalker 2 Mod Manager[/b][/size]
+[size=3]Install, sort and conflict-check your mods – edit MCM settings and key bindings – follow yourself on a live map.[/size]
+
+[b]Windows & Linux · Setup & Portable · English & German · Free and open source (MIT)[/b]
+
+[img]https://raw.githubusercontent.com/LizenzFracht/Stalker2ModManager/master/docs/media/01-mods.png[/img][/center]
+
+[line]
+
+[size=5][b]What it does[/b][/size]
+
+[b]All mod formats in one place[/b]
+Drag & drop ZIP, 7z or RAR archives, loose .pak/.utoc/.ucas files, DLL/ASI plugins or folders. S2MM figures out where everything belongs:
+[list]
+[*]classic pak mods → [i]~mods[/i] (with load-order prefix and [i]_P[/i] suffix)
+[*]official Zone Kit mods → [i]Stalker2\Mods\<Name>[/i] (e.g. the Mod Configuration Menu)
+[*]UE4SS Lua mods → [i]Binaries\Win64\ue4ss\Mods[/i]
+[*]DLL/ASI plugins and UE4SS itself → [i]Binaries\Win64[/i]
+[/list]
+Mods with a [b]FOMOD installer[/b] or several [b]variant folders[/b] get an options dialog – and you can change your choice later without reinstalling.
+
+[b]Load order, conflicts and auto-sort[/b]
+Drag mods into order – the lower one wins. S2MM reads the content of every pak and IoStore container and shows [b]exactly which .cfg or asset[/b] one mod overrides in another. [i]Auto-sort[/i] suggests a sensible order and explains every move.
+
+[center][img]https://raw.githubusercontent.com/LizenzFracht/Stalker2ModManager/master/docs/media/reorder.gif[/img]
+
+[img]https://raw.githubusercontent.com/LizenzFracht/Stalker2ModManager/master/docs/media/03-conflicts.png[/img][/center]
+
+[b]Safe by design[/b]
+[list]
+[*]Mods stay in their own library and are hard-linked (or copied) into the game.
+[*]Only files S2MM placed are ever removed; game files a mod replaces are backed up and restored.
+[*][b]Restore vanilla[/b] (offered on first start): removes all mods and – if you want – a manually installed UE4SS, other mods and all Engine.ini tweaks. Nothing is deleted, everything goes into a dated backup folder.
+[*]A read-only [b]Vanilla[/b] profile plus as many own profiles as you like.
+[/list]
+
+[b]Mod settings (MCM) and key bindings[/b]
+[list]
+[*]Edit the settings of the [b]Mod Configuration Menu[/b] without starting the game.
+[*]See every key your mods bind (UE4SS scripts, config files, MCM), spot double bindings and rebind with a key press.
+[*]Edit a mod's .ini, .lua or .json config right in the app.
+[/list]
+
+[center][img]https://raw.githubusercontent.com/LizenzFracht/Stalker2ModManager/master/docs/media/04-keybindings.png[/img][/center]
+
+[b]Live map[/b]
+S2MM opens [url=https://github.com/joric/stalker]joric's interactive Stalker 2 map[/url] in your browser and shows your in-game position and viewing direction live – with follow mode and a layer filter. A tiny bundled UE4SS mod reports your position; the map server only runs on your own PC.
+
+[center][img]https://raw.githubusercontent.com/LizenzFracht/Stalker2ModManager/master/docs/media/live-map.gif[/img][/center]
+
+[b]Game tweaks[/b]
+Curated Engine.ini switches (chromatic aberration, vignette, film grain, depth of field, motion blur, sharpening, texture pool, shader cache, view distance …), your own CVars, import/export of Engine.ini files and one-click restore.
+
+[b]And more[/b]
+[list]
+[*]Installs [b]UE4SS on demand[/b] – current release from GitHub incl. the Stalker 2 config for Steam or Game Pass, toggleable like a mod.
+[*]Finds Steam, Game Pass/Xbox, GOG and Epic installs and warns after game updates.
+[*]English and German interface, following your system language.
+[*]Portable mode – all data stays next to the program.
+[/list]
+
+[line]
+
+[size=5][b]Downloads[/b][/size]
+[list]
+[*][b]Windows setup[/b] – S2MM_x.y.z_windows_x64_setup.exe
+[*][b]Windows portable[/b] – S2MM_x.y.z_windows_x64_portable.zip (unzip, run S2MM.exe)
+[*][b]Linux setup[/b] – S2MM_x.y.z_linux_amd64_setup.deb
+[*][b]Linux portable[/b] – S2MM_x.y.z_linux_x86_64_portable.AppImage (chmod +x, run)
+[/list]
+Windows may show a SmartScreen warning because the program is not code-signed ("More info → Run anyway"). The source code is on [url=https://github.com/LizenzFracht/Stalker2ModManager]GitHub[/url] if you prefer to build it yourself.
+
+[b]Linux:[/b] S2MM manages a Steam/Proton install. For UE4SS mods add [i]WINEDLLOVERRIDES="dwmapi=n,b" %command%[/i] to the game's launch options.
+
+[b]Nexus downloads:[/b] the built-in "Mod Manager Download" support is switched off until S2MM is registered with Nexus Mods. Download mods in your browser and drop the archive into S2MM – the mod ID and version are read from the file name.
+
+[line]
+
+[size=5][b]Quick start[/b][/size]
+[list=1]
+[*]Start S2MM – it finds your game automatically.
+[*]Optional: click [i]Restore vanilla[/i] in the welcome dialog for a clean start.
+[*]Drop your mod archives into the window and choose options where asked.
+[*]Sort, check the [i]Conflicts[/i] page, then click [b]Apply[/b] and [b]Launch game[/b].
+[/list]
+
+[line]
+
+[size=5][b]Credits[/b][/size]
+[list]
+[*][url=https://github.com/joric/stalker]joric[/url] – the interactive Stalker 2 map used for the live map
+[*][url=https://github.com/UE4SS-RE/RE-UE4SS]UE4SS (RE-UE4SS)[/url] – Lua scripting framework and Stalker 2 game config
+[*]the authors of the Mod Configuration Menu (MCM) for Stalker 2
+[*][url=https://github.com/trumank/uesave-rs]uesave[/url] by trumank – Unreal SaveGame library
+[*]UnRAR by Alexander Roshal / RARLAB
+[*]Tauri, React, Tailwind CSS and many open-source libraries – full list in THIRD_PARTY_NOTICES.md and in the app
+[*]inspired by the Crimson Desert managers Definitive Mod Manager and CDUMM
+[/list]
+Built with the help of AI (Claude by Anthropic).
+
+[size=1]Unofficial fan project, not affiliated with GSC Game World, Nexus Mods, Valve or Microsoft. S.T.A.L.K.E.R. is a trademark of GSC Game World. Released under the MIT License.[/size]

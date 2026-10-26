@@ -1,6 +1,8 @@
 //! Applying a plan to the game folder. Only files we placed are ever removed; game files
 //! that a mod replaces are moved to a backup folder first and restored on removal.
 
+use crate::tr;
+
 use crate::game::{self, GameInfo};
 use crate::model::{DeployedFile, Deployment};
 use crate::plan::Plan;
@@ -18,7 +20,7 @@ pub struct ApplyResult {
 
 fn ensure_not_running() -> Result<()> {
     if !cfg!(test) && game::is_running() {
-        bail!("Stalker 2 läuft gerade. Bitte das Spiel schließen und erneut versuchen.");
+        bail!(tr!("Stalker 2 läuft gerade. Bitte das Spiel schließen und erneut versuchen.", "Stalker 2 is running. Please close the game and try again."));
     }
     Ok(())
 }
@@ -45,7 +47,7 @@ fn prune_dirs(game: &GameInfo, target: &Path) {
 fn remove_deployed(game: &GameInfo, f: &DeployedFile) -> Result<()> {
     let target = game.abs(&f.target);
     if target.exists() {
-        std::fs::remove_file(&target).with_context(|| format!("{} entfernen", f.target))?;
+        std::fs::remove_file(&target).with_context(|| tr!("{} entfernen", "Removing {}", f.target))?;
     }
     if let Some(backup) = &f.backup {
         let b = PathBuf::from(backup);
@@ -55,7 +57,7 @@ fn remove_deployed(game: &GameInfo, f: &DeployedFile) -> Result<()> {
             }
             std::fs::rename(&b, &target)
                 .or_else(|_| std::fs::copy(&b, &target).map(|_| ()).and_then(|_| std::fs::remove_file(&b)))
-                .with_context(|| format!("Original {} wiederherstellen", f.target))?;
+                .with_context(|| tr!("Original {} wiederherstellen", "Restoring original {}", f.target))?;
             return Ok(());
         }
     }
@@ -70,7 +72,7 @@ fn place(src: &Path, target: &Path, hardlink: bool) -> Result<()> {
     if hardlink && std::fs::hard_link(src, target).is_ok() {
         return Ok(());
     }
-    std::fs::copy(src, target).with_context(|| format!("{} kopieren", target.display()))?;
+    std::fs::copy(src, target).with_context(|| tr!("{} kopieren", "Copying {}", target.display()))?;
     Ok(())
 }
 
@@ -83,7 +85,7 @@ pub fn apply(
 ) -> Result<ApplyResult> {
     ensure_not_running()?;
     if !game.valid {
-        bail!("Spielordner ist ungültig");
+        bail!(tr!("Spielordner ist ungültig", "Invalid game folder"));
     }
     let same_game = old.game_path.eq_ignore_ascii_case(&game.path);
     let mut old_by_target: HashMap<String, &DeployedFile> = HashMap::new();
@@ -113,7 +115,7 @@ pub fn apply(
             // Replaced by another mod file: drop ours but keep the original's backup.
             let target = game.abs(&f.target);
             if target.exists() {
-                std::fs::remove_file(&target).with_context(|| format!("{} entfernen", f.target))?;
+                std::fs::remove_file(&target).with_context(|| tr!("{} entfernen", "Removing {}", f.target))?;
             }
             keep.insert(key, DeployedFile { size: u64::MAX, ..f.clone() });
             removed += 1;
@@ -153,10 +155,10 @@ pub fn apply(
             if b.exists() {
                 std::fs::remove_file(&b)?;
             }
-            std::fs::rename(&target, &b).with_context(|| format!("Original {} sichern", p.target))?;
+            std::fs::rename(&target, &b).with_context(|| tr!("Original {} sichern", "Backing up original {}", p.target))?;
             backup = Some(b.to_string_lossy().into_owned());
         } else if target.exists() {
-            std::fs::remove_file(&target).with_context(|| format!("{} ersetzen", p.target))?;
+            std::fs::remove_file(&target).with_context(|| tr!("{} ersetzen", "Replacing {}", p.target))?;
         }
         place(&p.src, &target, hardlinks)?;
         placed += 1;

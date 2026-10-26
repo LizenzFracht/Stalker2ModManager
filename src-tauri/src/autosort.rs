@@ -1,6 +1,8 @@
 //! Automatic load order: frameworks first, large pak overhauls before small targeted
 //! mods, patches/compat files last and directly after the mod they patch.
 
+use crate::tr;
+
 use crate::layout::TargetKind;
 use serde::Serialize;
 
@@ -40,15 +42,15 @@ fn has_word(name: &str, words: &[&str]) -> bool {
 fn classify(m: &SortInput) -> (u8, &'static str) {
     let paky = m.kinds.iter().any(|k| matches!(k, TargetKind::Pak | TargetKind::ZoneKit));
     if has_word(&m.name, &FRAMEWORK_WORDS) {
-        return (0, "Grundlage/Framework");
+        return (0, "framework");
     }
     if !paky && !m.kinds.is_empty() {
-        return (1, "Skript-/DLL-Mod ohne Pak-Konflikte");
+        return (1, "script");
     }
     if has_word(&m.name, &PATCH_WORDS) {
-        return (3, "Patch/Kompatibilität – muss gewinnen");
+        return (3, "patch");
     }
-    (2, "Pak-Mod")
+    (2, "pak")
 }
 
 pub fn sort(mods: &[SortInput]) -> Vec<SortEntry> {
@@ -63,7 +65,14 @@ pub fn sort(mods: &[SortInput]) -> Vec<SortEntry> {
     let mut order: Vec<(usize, &SortInput, String)> = items
         .into_iter()
         .map(|(i, m, r, why)| {
-            let reason = if r == 2 && m.assets > 0 { format!("{why} · {} Assets", m.assets) } else { why.to_string() };
+            let _ = why;
+            let reason = match r {
+                0 => tr!("Grundlage/Framework", "Framework/base"),
+                1 => tr!("Skript-/DLL-Mod ohne Pak-Konflikte", "Script/DLL mod without pak conflicts"),
+                3 => tr!("Patch/Kompatibilität – muss gewinnen", "Patch/compatibility – has to win"),
+                _ if m.assets > 0 => tr!("Pak-Mod · {} Assets", "Pak mod · {} assets", m.assets),
+                _ => tr!("Pak-Mod", "Pak mod"),
+            };
             (i, m, reason)
         })
         .collect();
@@ -83,7 +92,7 @@ pub fn sort(mods: &[SortInput]) -> Vec<SortEntry> {
             let entry = order.remove(from);
             let at = order.iter().position(|(_, m, _)| m.id == parent).unwrap() + 1;
             let parent_name = mods.iter().find(|m| m.id == parent).unwrap().name.clone();
-            order.insert(at, (entry.0, entry.1, format!("Patch für „{parent_name}“ – direkt danach")));
+            order.insert(at, (entry.0, entry.1, tr!("Patch für „{p}“ – direkt danach", "Patch for “{p}” – right after it", p = parent_name)));
         }
     }
 

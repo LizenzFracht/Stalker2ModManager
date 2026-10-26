@@ -1,0 +1,87 @@
+name: Release
+
+# Push a tag like v0.2.0 to build all packages and create a draft release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            bundles: nsis
+          - os: ubuntu-22.04
+            bundles: deb,appimage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux system libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Build
+        run: npx tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Collect Windows packages
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force out, portable | Out-Null
+          Copy-Item src-tauri/target/release/bundle/nsis/*-setup.exe "out/S2MM_${version}_windows_x64_setup.exe"
+          Copy-Item src-tauri/target/release/stalker2mm.exe portable/S2MM.exe
+          New-Item -ItemType File portable/portable.txt | Out-Null
+          Copy-Item LICENSE, THIRD_PARTY_NOTICES.md portable/
+          Compress-Archive -Path portable/* -DestinationPath "out/S2MM_${version}_windows_x64_portable.zip"
+
+      - name: Collect Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          version=$(jq -r .version src-tauri/tauri.conf.json)
+          mkdir -p out
+          cp src-tauri/target/release/bundle/deb/*.deb "out/S2MM_${version}_linux_amd64_setup.deb"
+          cp src-tauri/target/release/bundle/appimage/*.AppImage "out/S2MM_${version}_linux_x86_64_portable.AppImage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ runner.os }}
+          path: out/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Checksums
+        run: cd out && sha256sum * > SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: out/*

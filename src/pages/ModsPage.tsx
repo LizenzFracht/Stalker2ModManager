@@ -38,6 +38,7 @@ import { Badge, Button, Empty, Toggle, kindLabel } from "../components/ui";
 import type { ModView } from "../types";
 import { ModDetail } from "./ModDetail";
 import { AutosortDialog } from "./AutosortDialog";
+import { t } from "../i18n";
 
 type Filter = "all" | "enabled" | "disabled" | "updates" | "issues";
 
@@ -85,7 +86,7 @@ export function useToggleMods() {
     setState(s);
     if (before === "vanilla" && s.activeProfile !== before) {
       const name = s.profiles.find((p) => p.id === s.activeProfile)?.name;
-      toast("info", `Das Vanilla-Profil bleibt ohne Mods – zu Profil „${name}“ gewechselt.`);
+      toast("info", t("Das Vanilla-Profil bleibt ohne Mods – zu Profil „{name}“ gewechselt.", { name: name ?? "" }));
     }
   };
 }
@@ -131,7 +132,7 @@ function ModRow({ mod, selected, draggable }: { mod: ModView; selected: boolean;
           {mod.version && <span className="shrink-0 font-mono text-[11px] text-dim">v{mod.version.replace(/^v/i, "")}</span>}
         </div>
         <div className="truncate text-xs text-dim">
-          {mod.author ? `von ${mod.author}` : mod.archiveName ?? "Manuell hinzugefügt"}
+          {mod.author ? t("von {author}", { author: mod.author }) : mod.archiveName ?? t("Manuell hinzugefügt")}
           {mod.category && <span> · {mod.category}</span>}
         </div>
       </div>
@@ -143,36 +144,36 @@ function ModRow({ mod, selected, draggable }: { mod: ModView; selected: boolean;
               setOptionsFor(mod.id);
             }}
           >
-            <Badge tone="accent" title="Diese Mod hat Optionen, die noch nicht bestätigt wurden">
-              <Settings2 size={11} /> Optionen
+            <Badge tone="accent" title={t("Diese Mod hat Optionen, die noch nicht bestätigt wurden")}>
+              <Settings2 size={11} /> {t("Optionen")}
             </Badge>
           </button>
         )}
         {mod.update?.available && (
-          <Badge tone="info" title={`Neue Version ${mod.update.latestVersion ?? ""} auf Nexus`}>
+          <Badge tone="info" title={t("Neue Version {v} auf Nexus", { v: mod.update.latestVersion ?? "" })}>
             <Sparkles size={11} /> Update
           </Badge>
         )}
         {mod.plan.files === 0 && (
-          <Badge tone="danger" title="Keine Dateien gefunden, die installiert werden können">
-            <AlertTriangle size={11} /> Leer
+          <Badge tone="danger" title={t("Keine Dateien gefunden, die installiert werden können")}>
+            <AlertTriangle size={11} /> {t("Leer")}
           </Badge>
         )}
         {mod.enabled && mod.conflicts.wins > 0 && (
-          <span className="flex items-center gap-0.5 font-mono text-[11px] text-ok" title={`Überschreibt ${mod.conflicts.wins} Dateien anderer Mods`}>
+          <span className="flex items-center gap-0.5 font-mono text-[11px] text-ok" title={t("Überschreibt {n} Dateien anderer Mods", { n: mod.conflicts.wins })}>
             <ArrowUpCircle size={13} />
             {mod.conflicts.wins}
           </span>
         )}
         {mod.enabled && mod.conflicts.loses > 0 && (
-          <span className="flex items-center gap-0.5 font-mono text-[11px] text-danger" title={`${mod.conflicts.loses} Dateien werden von anderen Mods überschrieben`}>
+          <span className="flex items-center gap-0.5 font-mono text-[11px] text-danger" title={t("{n} Dateien werden von anderen Mods überschrieben", { n: mod.conflicts.loses })}>
             <ArrowDownCircle size={13} />
             {mod.conflicts.loses}
           </span>
         )}
         {mod.plan.kinds.map((k) => (
-          <Badge key={k} title={kindLabel[k].title}>
-            {kindLabel[k].label}
+          <Badge key={k} title={t(kindLabel[k].title)}>
+            {t(kindLabel[k].label)}
           </Badge>
         ))}
       </div>
@@ -229,14 +230,14 @@ export function ModsPage() {
   const addFiles = async () => {
     const files = await open({
       multiple: true,
-      title: "Mods hinzufügen",
+      title: t("Mods hinzufügen"),
       filters: [{ name: "Mods", extensions: ["zip", "7z", "rar", "pak", "utoc", "ucas", "dll", "asi"] }],
     });
     if (files) install(Array.isArray(files) ? files : [files]);
   };
 
   const addFolder = async () => {
-    const dir = await open({ directory: true, title: "Mod-Ordner hinzufügen" });
+    const dir = await open({ directory: true, title: t("Mod-Ordner hinzufügen") });
     if (typeof dir === "string") install([dir]);
   };
 
@@ -245,43 +246,43 @@ export function ModsPage() {
       <section className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center gap-2 px-5 pb-3 pt-4">
           <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={addFiles}>
-            Mod hinzufügen
+            {t("Mod hinzufügen")}
           </Button>
           <Button icon={<FolderPlus size={16} />} onClick={addFolder}>
-            Ordner
+            {t("Ordner")}
           </Button>
-          {state.settings.nexusApiKey && (
+          {state.nexusEnabled && state.settings.nexusApiKey && (
             <Button
               icon={<RefreshCw size={15} />}
               onClick={async () => {
-                const s = await run(() => api.checkUpdates(), { busy: "Prüfe Nexus auf Updates …" });
+                const s = await run(() => api.checkUpdates(), { busy: t("Prüfe Nexus auf Updates …") });
                 if (s) {
                   setState(s);
                   const n = s.mods.filter((m) => m.update?.available).length;
-                  toast(n ? "info" : "success", n ? `${n} Update(s) verfügbar` : "Alle Nexus-Mods sind aktuell.");
+                  toast(n ? "info" : "success", n ? t("{n} Update(s) verfügbar", { n }) : t("Alle Nexus-Mods sind aktuell."));
                 }
               }}
             >
-              Updates prüfen
+              {t("Updates prüfen")}
             </Button>
           )}
           <Button icon={<Wand2 size={15} />} onClick={() => setSorting(true)} disabled={mods.length < 2}>
-            Automatisch sortieren
+            {t("Automatisch sortieren")}
           </Button>
           <div className="relative ml-auto w-64">
             <Search size={15} className="pointer-events-none absolute left-3 top-2.5 text-dim" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Mods durchsuchen"
-              aria-label="Mods durchsuchen"
+              placeholder={t("Mods durchsuchen")}
+              aria-label={t("Mods durchsuchen")}
               className="h-9 w-full rounded-md border border-line-strong bg-bg pl-9 pr-3 text-sm placeholder:text-dim focus:border-accent focus:outline-none"
             />
           </div>
         </div>
 
         <div className="flex items-center gap-1 px-5 pb-3">
-          {filters.map((f) => (
+          {filters.filter((f) => f.id !== "updates" || state.nexusEnabled).map((f) => (
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
@@ -289,13 +290,13 @@ export function ModsPage() {
                 filter === f.id ? "bg-accent text-accent-ink font-semibold" : "text-muted hover:bg-hover hover:text-text"
               }`}
             >
-              {f.label}
+              {t(f.label)}
               {f.id === "updates" && updates > 0 && <span className="ml-1 font-mono">{updates}</span>}
             </button>
           ))}
           <span className="ml-auto text-xs text-dim">
-            {active} von {mods.length} aktiv
-            {!draggable && mods.length > 0 && " · Sortieren nur ohne Filter"}
+            {t("{n} von {total} aktiv", { n: active, total: mods.length })}
+            {!draggable && mods.length > 0 && " · " + t("Sortieren nur ohne Filter")}
           </span>
         </div>
 
@@ -316,14 +317,12 @@ export function ModsPage() {
               </Button>
             }
           >
-            Profil „Vanilla“ ist aktiv: Das Spiel läuft ohne Mods. Dieses Profil ist schreibgeschützt – wenn du eine Mod aktivierst,
-            wechselt S2MM automatisch in dein Mod-Profil.
+            {t("Profil „Vanilla“ ist aktiv: Das Spiel läuft ohne Mods. Dieses Profil ist schreibgeschützt – wenn du eine Mod aktivierst, wechselt S2MM automatisch in dein Mod-Profil.")}
           </Banner>
         )}
         {state.gameUpdated && (
           <Banner tone="info">
-            Stalker 2 wurde seit dem letzten Anwenden aktualisiert. Prüfe, ob deine Mods noch zur Spielversion passen, und klicke
-            danach auf „Anwenden“.
+            {t("Stalker 2 wurde seit dem letzten Anwenden aktualisiert. Prüfe, ob deine Mods noch zur Spielversion passen, und klicke danach auf „Anwenden“.")}
           </Banner>
         )}
         {state.unmanaged.length > 0 && (
@@ -333,35 +332,34 @@ export function ModsPage() {
               <Button
                 size="sm"
                 onClick={async () => {
-                  const r = await run(() => api.importUnmanaged(state.unmanaged), { busy: "Übernehme Dateien …" });
+                  const r = await run(() => api.importUnmanaged(state.unmanaged), { busy: t("Übernehme Dateien …") });
                   if (r) {
                     setState(r.state);
                     r.errors.forEach((e) => toast("error", e));
-                    if (r.added.length) toast("success", `${r.added.length} Mod(s) übernommen. Zum Aktivieren „Anwenden“ klicken.`);
+                    if (r.added.length) toast("success", t("{n} Mod(s) übernommen. Zum Aktivieren „Anwenden“ klicken.", { n: r.added.length }));
                   }
                 }}
               >
-                In S2MM übernehmen
+                {t("In S2MM übernehmen")}
               </Button>
             }
           >
-            {state.unmanaged.length} Datei(en) im ~mods-Ordner werden nicht von S2MM verwaltet (z. B. manuell installiert). Übernommene Dateien
-            kannst du hier aktivieren, sortieren und auf Konflikte prüfen.
+            {t("{n} Datei(en) im ~mods-Ordner werden nicht von S2MM verwaltet (z. B. manuell installiert). Übernommene Dateien kannst du hier aktivieren, sortieren und auf Konflikte prüfen.", { n: state.unmanaged.length })}
           </Banner>
         )}
         {state.conflictErrors > 0 && (
           <Banner tone="accent" action={<Button size="sm" onClick={() => setPage("conflicts")}>Details</Button>}>
-            {state.conflictErrors} Pak-Datei(en) konnten nicht auf Konflikte geprüft werden.
+            {t("{n} Pak-Datei(en) konnten nicht auf Konflikte geprüft werden.", { n: state.conflictErrors })}
           </Banner>
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-line">
           {mods.length === 0 ? (
-            <Empty icon={<Package size={44} />} title="Noch keine Mods">
-              Ziehe Archive (ZIP, 7z, RAR), Pak-Dateien oder Ordner in dieses Fenster, oder nutze „Mod Manager Download“ auf Nexus Mods.
+            <Empty icon={<Package size={44} />} title={t("Noch keine Mods")}>
+              {state.nexusEnabled ? t("Ziehe Archive (ZIP, 7z, RAR), Pak-Dateien oder Ordner in dieses Fenster, oder nutze „Mod Manager Download“ auf Nexus Mods.") : t("Ziehe Archive (ZIP, 7z, RAR), Pak-Dateien oder Ordner in dieses Fenster.")}
             </Empty>
           ) : visible.length === 0 ? (
-            <Empty icon={<Search size={40} />} title="Keine Treffer" />
+            <Empty icon={<Search size={40} />} title={t("Keine Treffer")} />
           ) : (
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext items={visible.map((m) => m.id)} strategy={verticalListSortingStrategy}>
@@ -373,8 +371,7 @@ export function ModsPage() {
           )}
           {mods.length > 1 && (
             <p className="px-5 py-4 text-xs leading-relaxed text-dim">
-              Ladereihenfolge: Weiter unten stehende Mods werden später geladen und gewinnen bei Konflikten. Pak-Dateien erhalten
-              dafür beim Anwenden ein Nummern-Präfix.
+              {t("Ladereihenfolge: Weiter unten stehende Mods werden später geladen und gewinnen bei Konflikten. Pak-Dateien erhalten dafür beim Anwenden ein Nummern-Präfix.")}
             </p>
           )}
         </div>

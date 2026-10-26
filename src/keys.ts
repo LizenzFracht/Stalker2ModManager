@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 // Key name conversions between the browser, UE4SS (`Key.F5`), Unreal FKey names (`F5`,
 // `SpaceBar`, `NumPadOne`) and Windows virtual-key codes (`0x74`).
 
@@ -100,7 +102,7 @@ export function keyLabel(key: string): string {
   const c = canonicalKey(key);
   const num = /^NUM(ZERO|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE)$/.exec(c);
   if (num) return `Num ${labels[num[1]]}`;
-  return labels[c] ?? (c.length <= 3 ? c : cap(key.replace(/_/g, " ")));
+  return labels[c] ? t(labels[c]) : c.length <= 3 ? c : cap(key.replace(/_/g, " "));
 }
 
 export function comboId(key: string, modifiers: string[]) {

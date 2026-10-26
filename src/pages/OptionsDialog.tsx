@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { Button, Modal } from "../components/ui";
 import type { GroupKind, ModOption, ModView, OptionGroup } from "../types";
+import { t } from "../i18n";
 
 const kindHint: Record<GroupKind, string> = {
   exactlyOne: "Genau eine auswählen",
@@ -29,9 +30,9 @@ function initialSelection(mod: ModView) {
 }
 
 function groupError(g: OptionGroup, chosen: string[]) {
-  if (g.kind === "exactlyOne" && chosen.length !== 1) return "Bitte genau eine Option wählen.";
-  if (g.kind === "atLeastOne" && chosen.length < 1) return "Bitte mindestens eine Option wählen.";
-  if (g.kind === "atMostOne" && chosen.length > 1) return "Höchstens eine Option erlaubt.";
+  if (g.kind === "exactlyOne" && chosen.length !== 1) return t("Bitte genau eine Option wählen.");
+  if (g.kind === "atLeastOne" && chosen.length < 1) return t("Bitte mindestens eine Option wählen.");
+  if (g.kind === "atMostOne" && chosen.length > 1) return t("Höchstens eine Option erlaubt.");
   return null;
 }
 
@@ -87,14 +88,14 @@ export function OptionsDialog({ modId, onClose }: { modId: string; onClose: () =
 
   return (
     <Modal
-      title={<>Optionen · <span className="text-accent">{mod.name}</span></>}
+      title={<>{t("Optionen ·")} <span className="text-accent">{mod.name}</span></>}
       onClose={onClose}
       width={hasImages ? "max-w-5xl" : "max-w-2xl"}
       footer={
         <>
           {errors.length > 0 && <span className="mr-auto self-center text-xs text-danger">{errors[0]}</span>}
-          <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
-          <Button variant="primary" onClick={save} disabled={errors.length > 0}>Übernehmen</Button>
+          <Button variant="ghost" onClick={onClose}>{t("Abbrechen")}</Button>
+          <Button variant="primary" onClick={save} disabled={errors.length > 0}>{t("Übernehmen")}</Button>
         </>
       }
     >
@@ -102,9 +103,9 @@ export function OptionsDialog({ modId, onClose }: { modId: string; onClose: () =
         <div className="space-y-6">
           <p className="text-[13px] leading-relaxed text-muted">
             {mod.layout.fomod
-              ? "Diese Mod bringt einen Installer (FOMOD) mit. Wähle die gewünschten Komponenten."
-              : "S2MM hat in dieser Mod mehrere Varianten bzw. optionale Ordner erkannt."}{" "}
-            Du kannst die Auswahl jederzeit ändern – danach „Anwenden“ klicken.
+              ? t("Diese Mod bringt einen Installer (FOMOD) mit. Wähle die gewünschten Komponenten.")
+              : t("S2MM hat in dieser Mod mehrere Varianten bzw. optionale Ordner erkannt.")}{" "}
+            {t("Du kannst die Auswahl jederzeit ändern – danach „Anwenden“ klicken.")}
           </p>
           {steps.map(([step, groups]) => (
             <div key={step} className="space-y-4">
@@ -114,8 +115,8 @@ export function OptionsDialog({ modId, onClose }: { modId: string; onClose: () =
                 return (
                   <fieldset key={g.id} className="rounded-lg border border-line bg-bg/40 p-3">
                     <legend className="px-1.5">
-                      <span className="text-sm font-medium">{g.name}</span>
-                      <span className="ml-2 text-xs text-dim">{kindHint[g.kind]}</span>
+                      <span className="text-sm font-medium">{t(g.name)}</span>
+                      <span className="ml-2 text-xs text-dim">{t(kindHint[g.kind])}</span>
                     </legend>
                     <div className="space-y-1">
                       {g.options.map((o) => {

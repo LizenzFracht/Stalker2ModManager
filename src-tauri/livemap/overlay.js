@@ -1,5 +1,7 @@
 // S2MM live position overlay, injected into joric's Stalker 2 map by the local S2MM server.
 (function () {
+  const EN = window.__s2mmLang !== "de";
+  const L = (de, en) => (EN ? en : de);
   const css = `
     #s2mm-live{position:fixed;left:50%;transform:translateX(-50%);bottom:12px;z-index:9999;display:flex;align-items:center;gap:10px;
       padding:8px 12px;border-radius:8px;background:rgba(18,19,17,.92);color:#e9e5d8;border:1px solid #3d3e35;
@@ -31,7 +33,7 @@
 
   const panel = document.createElement("div");
   panel.id = "s2mm-live";
-  panel.innerHTML = '<span class="dot"></span><strong>S2MM Live</strong><span class="coords">warte auf Spiel …</span><button type="button">Folgen</button>';
+  panel.innerHTML = '<span class="dot"></span><strong>S2MM Live</strong><span class="coords">' + L("warte auf Spiel …", "waiting for the game …") + '</span><button type="button">' + L("Folgen", "Follow") + "</button>";
   document.body.appendChild(panel);
   const coords = panel.querySelector(".coords");
   const followBtn = panel.querySelector("button");
@@ -76,10 +78,10 @@
       const live = p.ok && p.age < 6;
       panel.classList.toggle("on", live);
       if (!p.ok) {
-        coords.textContent = "keine Daten – Spiel mit S2MM-Live-Map-Mod starten";
+        coords.textContent = L("keine Daten – Spiel mit S2MM-Live-Map-Mod starten", "no data – start the game with the S2MM live map mod");
         return;
       }
-      coords.textContent = `${live ? "" : "(veraltet) "}X ${Math.round(p.x)}  Y ${Math.round(p.y)}  Z ${Math.round(p.z)}`;
+      coords.textContent = `${live ? "" : L("(veraltet) ", "(stale) ")}X ${Math.round(p.x)}  Y ${Math.round(p.y)}  Z ${Math.round(p.z)}`;
       const map = getMap();
       if (!map || !ensureLayer(map)) return;
       dot.setCoordinates([p.x, p.y]);
@@ -89,7 +91,7 @@
       if (follow) map.panTo([p.x, p.y], { duration: 400 });
     } catch (e) {
       panel.classList.remove("on");
-      coords.textContent = "S2MM nicht erreichbar";
+      coords.textContent = L("S2MM nicht erreichbar", "S2MM not reachable");
     }
   }
   setInterval(tick, 1000);
@@ -109,12 +111,20 @@
     T_DLCWorldMap_UDIM_nofog: "Weltkarte ohne Nebel", T_ZU_UndergroundMap_UDIM: "Untergrund", topographic: "Topografisch",
     relief: "Relief", blank: "Leer",
   };
-  const label = (id) => names[id.toLowerCase()] || id.replace(/_/g, " ");
+  const baseNamesEn = {
+    T_ZU_UndergroundMapDLC_UDIM: "Map + underground (DLC)", T_DLCWorldMap_UDIM: "World map (DLC)", diegetic: "PDA map",
+    T_DLCWorldMap_UDIM_nofog: "World map without fog", T_ZU_UndergroundMap_UDIM: "Underground", topographic: "Topographic",
+    relief: "Relief", blank: "Blank",
+  };
+  const namesEn = { heightmap: "Height points", lines: "Connections", actors: "NPCs & objects", helpers: "Helper points", polygons: "Areas", hubs: "Settlements" };
+  const pretty = (id) => id.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  const label = (id) => (EN ? namesEn[id.toLowerCase()] || pretty(id) : names[id.toLowerCase()] || pretty(id));
+  const baseLabel = (id) => (EN ? baseNamesEn[id] : baseNames[id]) || id.replace(/_/g, " ");
 
   const box = document.createElement("div");
   box.id = "s2mm-layers";
   let collapsed = localStorage.getItem("s2mm-layers-collapsed") === "1";
-  box.innerHTML = '<header><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0a526" stroke-width="2"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg><span>Ebenen</span><button type="button" title="Ein-/ausklappen"></button></header><div class="body"></div>';
+  box.innerHTML = '<header><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0a526" stroke-width="2"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg><span>' + L("Ebenen", "Layers") + '</span><button type="button" title="' + L("Ein-/ausklappen", "Collapse/expand") + '"></button></header><div class="body"></div>';
   document.body.appendChild(box);
   const body = box.querySelector(".body");
   const toggleBtn = box.querySelector("header button");
@@ -160,8 +170,8 @@
     const ovs = overlays();
     if (!ovs.length) return false;
     const q = filter.toLowerCase();
-    let html = '<input type="search" placeholder="Ebene suchen …" value="' + filter.replace(/"/g, "") + '">';
-    html += '<div class="row"><button data-all="1">Alle</button><button data-all="0">Keine</button></div><h4>Markierungen</h4>';
+    let html = '<input type="search" placeholder="' + L("Ebene suchen …", "Search layers …") + '" value="' + filter.replace(/"/g, "") + '">';
+    html += '<div class="row"><button data-all="1">' + L("Alle", "All") + '</button><button data-all="0">' + L("Keine", "None") + "</button></div><h4>" + L("Markierungen", "Markers") + "</h4>";
     for (const l of ovs) {
       const id = l.getId();
       if (q && !label(id).toLowerCase().includes(q) && !id.toLowerCase().includes(q)) continue;
@@ -169,10 +179,10 @@
     }
     const bs = bases();
     if (bs.length) {
-      html += "<h4>Grundkarte</h4>";
+      html += "<h4>" + L("Grundkarte", "Base map") + "</h4>";
       for (const b of bs) {
         const id = b.getId();
-        html += '<label><input type="radio" name="s2mm-base" data-base="' + id + '"' + (b.isVisible() ? " checked" : "") + "> " + (baseNames[id] || id.replace(/_/g, " ")) + "</label>";
+        html += '<label><input type="radio" name="s2mm-base" data-base="' + id + '"' + (b.isVisible() ? " checked" : "") + "> " + baseLabel(id) + "</label>";
       }
     }
     body.innerHTML = html;

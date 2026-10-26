@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { keyForStyle, keyLabel } from "../keys";
 import { Button, Modal } from "./ui";
+import { t } from "../i18n";
 
 export function KeyChip({ k, modifiers = [] }: { k: string; modifiers?: string[] }) {
   return (
@@ -44,11 +45,11 @@ export function KeyCapture({
       if (e.code === "Escape" && !picked) return onClose();
       const key = keyForStyle(e.code, source, style);
       if (!key) {
-        setHint(`Die Taste „${e.code}“ wird von diesem Format nicht unterstützt.`);
+        setHint(t("Die Taste „{key}“ wird von diesem Format nicht unterstützt.", { key: e.code }));
         return;
       }
       const mods = allowModifiers ? [e.ctrlKey && "CONTROL", e.shiftKey && "SHIFT", e.altKey && "ALT"].filter(Boolean) as string[] : [];
-      setHint(!allowModifiers && (e.ctrlKey || e.shiftKey || e.altKey) ? "Dieses Format unterstützt keine Zusatztasten – sie werden ignoriert." : "");
+      setHint(!allowModifiers && (e.ctrlKey || e.shiftKey || e.altKey) ? t("Dieses Format unterstützt keine Zusatztasten – sie werden ignoriert.") : "");
       setPicked({ key, mods });
     };
     window.addEventListener("keydown", onKey, true);
@@ -62,14 +63,14 @@ export function KeyCapture({
       width="max-w-md"
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Abbrechen</Button>
-          <Button variant="primary" disabled={!picked} onClick={() => picked && onDone(picked.key, picked.mods)}>Übernehmen</Button>
+          <Button variant="ghost" onClick={onClose}>{t("Abbrechen")}</Button>
+          <Button variant="primary" disabled={!picked} onClick={() => picked && onDone(picked.key, picked.mods)}>{t("Übernehmen")}</Button>
         </>
       }
     >
       <div className="flex min-h-32 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-line-strong bg-bg py-6">
-        {picked ? <KeyChip k={picked.key} modifiers={picked.mods} /> : <span className="pulse-dot text-sm text-muted">Neue Taste drücken …</span>}
-        {allowModifiers && <span className="text-xs text-dim">Strg, Shift und Alt können kombiniert werden.</span>}
+        {picked ? <KeyChip k={picked.key} modifiers={picked.mods} /> : <span className="pulse-dot text-sm text-muted">{t("Neue Taste drücken …")}</span>}
+        {allowModifiers && <span className="text-xs text-dim">{t("Strg, Shift und Alt können kombiniert werden.")}</span>}
       </div>
       {hint && <p className="mt-3 text-xs text-accent">{hint}</p>}
     </Modal>

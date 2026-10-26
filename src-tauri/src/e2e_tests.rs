@@ -207,10 +207,11 @@ fn full_cycle() {
 
 #[test]
 fn stages_real_mcm_archive() {
-    let archive = Path::new("USER_HOME/Downloads/Mod Configuration Menu 2.0 2225 2.0 2026-08-21T10-57Z m28tJ8Sqk (1).7z");
-    if !archive.exists() {
+    // Point S2MM_TEST_MCM_ARCHIVE at a downloaded "Mod Configuration Menu" archive to run this.
+    let Some(archive) = std::env::var_os("S2MM_TEST_MCM_ARCHIVE").map(PathBuf::from) else {
         return;
-    }
+    };
+    let archive = archive.as_path();
     let tmp = std::env::temp_dir().join(format!("s2mm-mcm-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&tmp);
     std::fs::create_dir_all(tmp.join("game/Stalker2/Content/Paks")).unwrap();
@@ -278,5 +279,57 @@ fn livemap_server_proxies_and_injects() {
     let js = get("/js/lib/maptalks-gl/maptalks-gl.js");
     assert!(js.starts_with("HTTP/1.1 200") && js.contains("text/javascript"));
     server.stop();
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn db_with_staged_mods_serializes() {
+    let tmp = std::env::temp_dir().join(format!("s2mm-ser-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).unwrap();
+    let a = tmp.join("Some Mod-123-1-0-1732400000.zip");
+    make_zip(&a, &[("x/A_P.pak", fake_pak(&["a/b.cfg"])), ("y/A_P.pak", fake_pak(&["a/b.cfg"]))]);
+    let mut db = Db::default();
+    let e = stage(&tmp.join("mods"), &a, InstallMeta::default(), None).unwrap();
+    db.profile_mut().mods.push(ProfileMod { id: e.id.clone(), enabled: true });
+    db.mods.push(e);
+    db.normalize();
+    let path = tmp.join("state.json");
+    crate::util::write_json(&path, &db).expect("state.json must be writable");
+    let back: Db = crate::util::read_json(&path).unwrap();
+    assert_eq!(back.mods.len(), 1);
+    std::fs::remove_dir_all(&tmp).unwrap();
+}
+
+/// Re-stages every mod of a real library (S2MM_TEST_LIBRARY=<data>/mods) into a temp folder
+/// and saves the resulting database – catches data that cannot be serialized.
+#[test]
+#[ignore = "needs a real mod library"]
+fn real_library_serializes() {
+    let Some(lib) = std::env::var_os("S2MM_TEST_LIBRARY").map(PathBuf::from) else { return };
+    let tmp = std::env::temp_dir().join(format!("s2mm-lib-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let mut db = Db::default();
+    for e in std::fs::read_dir(&lib).unwrap().flatten() {
+        let files = e.path().join("files");
+        if !files.is_dir() {
+            continue;
+        }
+        for top in std::fs::read_dir(&files).unwrap().flatten() {
+            match stage(&tmp.join("mods"), &top.path(), InstallMeta::default(), None) {
+                Ok(m) => {
+                    println!("staged {} ({} groups)", m.name, m.layout.groups.len());
+                    if let Err(err) = serde_json::to_vec(&m) {
+                        println!("  !! cannot serialize {}: {err}", m.name);
+                    }
+                    db.mods.push(m);
+                }
+                Err(err) => println!("stage {:?}: {err:#}", top.path()),
+            }
+        }
+    }
+    db.normalize();
+    crate::util::write_json(&tmp.join("state.json"), &db).expect("save failed");
+    println!("saved {} mods", db.mods.len());
     let _ = std::fs::remove_dir_all(&tmp);
 }

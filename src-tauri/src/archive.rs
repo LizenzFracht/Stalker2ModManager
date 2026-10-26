@@ -1,5 +1,7 @@
 //! Extracting mod archives (zip / 7z / rar) or copying loose files into staging.
 
+use crate::tr;
+
 use crate::util::{copy_dir, ext_lower};
 use anyhow::{bail, Context, Result};
 use std::path::Path;
@@ -21,37 +23,37 @@ pub fn is_supported(path: &Path) -> bool {
 pub fn unpack(src: &Path, dest: &Path) -> Result<()> {
     std::fs::create_dir_all(dest)?;
     if src.is_dir() {
-        let name = src.file_name().context("Ungültiger Ordner")?;
+        let name = src.file_name().context(tr!("Ungültiger Ordner", "Invalid folder"))?;
         return copy_dir(src, &dest.join(name));
     }
     let ext = ext_lower(&src.to_string_lossy());
     match ext.as_str() {
         "zip" => {
             let file = std::fs::File::open(src)?;
-            let mut zip = zip::ZipArchive::new(file).context("ZIP-Archiv ist beschädigt")?;
-            zip.extract(dest).context("ZIP entpacken")?;
+            let mut zip = zip::ZipArchive::new(file).context(tr!("ZIP-Archiv ist beschädigt", "ZIP archive is damaged"))?;
+            zip.extract(dest).context(tr!("ZIP entpacken", "Extracting ZIP"))?;
         }
         "7z" => {
-            sevenz_rust2::decompress_file(src, dest).map_err(|e| anyhow::anyhow!("7z entpacken: {e}"))?;
+            sevenz_rust2::decompress_file(src, dest).map_err(|e| anyhow::anyhow!(tr!("7z entpacken: {e}", "Extracting 7z: {e}", e = e)))?;
         }
         "rar" => {
             let mut archive = unrar::Archive::new(src)
                 .open_for_processing()
-                .map_err(|e| anyhow::anyhow!("RAR öffnen: {e}"))?;
-            while let Some(header) = archive.read_header().map_err(|e| anyhow::anyhow!("RAR lesen: {e}"))? {
+                .map_err(|e| anyhow::anyhow!(tr!("RAR öffnen: {e}", "Opening RAR: {e}", e = e)))?;
+            while let Some(header) = archive.read_header().map_err(|e| anyhow::anyhow!(tr!("RAR lesen: {e}", "Reading RAR: {e}", e = e)))? {
                 archive = if header.entry().is_file() {
                     header
                         .extract_with_base(dest)
-                        .map_err(|e| anyhow::anyhow!("RAR entpacken: {e}"))?
+                        .map_err(|e| anyhow::anyhow!(tr!("RAR entpacken: {e}", "Extracting RAR: {e}", e = e)))?
                 } else {
-                    header.skip().map_err(|e| anyhow::anyhow!("RAR lesen: {e}"))?
+                    header.skip().map_err(|e| anyhow::anyhow!(tr!("RAR lesen: {e}", "Reading RAR: {e}", e = e)))?
                 };
             }
         }
         e if PAK_EXTS.contains(&e) => {
             // A loose pak: bring its IoStore siblings (same stem) along.
-            let stem = src.file_stem().context("Ungültiger Dateiname")?.to_string_lossy().to_lowercase();
-            let dir = src.parent().context("Ungültiger Pfad")?;
+            let stem = src.file_stem().context(tr!("Ungültiger Dateiname", "Invalid file name"))?.to_string_lossy().to_lowercase();
+            let dir = src.parent().context(tr!("Ungültiger Pfad", "Invalid path"))?;
             for entry in std::fs::read_dir(dir)?.flatten() {
                 let p = entry.path();
                 let pe = ext_lower(&p.to_string_lossy());
@@ -64,7 +66,7 @@ pub fn unpack(src: &Path, dest: &Path) -> Result<()> {
         "dll" | "asi" => {
             std::fs::copy(src, dest.join(src.file_name().unwrap()))?;
         }
-        _ => bail!("Nicht unterstütztes Dateiformat: .{ext}"),
+        _ => bail!(tr!("Nicht unterstütztes Dateiformat: .{ext}", "Unsupported file format: .{ext}", ext = ext)),
     }
     Ok(())
 }

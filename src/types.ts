@@ -20,6 +20,7 @@ export interface Settings {
   livemapModId: string | null;
   mapPort: number;
   firstRunDone: boolean;
+  language: string;
 }
 
 export interface VanillaReport {
@@ -194,6 +195,7 @@ export interface AppState {
   unmanaged: string[];
   gameUpdated: boolean;
   nexusUser: NexusUser | null;
+  nexusEnabled: boolean;
   dataDir: string;
   appVersion: string;
   conflictErrors: number;

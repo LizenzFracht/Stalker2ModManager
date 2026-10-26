@@ -1,3 +1,4 @@
+use crate::tr;
 use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use std::path::{Path, PathBuf};
@@ -80,8 +81,8 @@ pub fn read_json<T: DeserializeOwned + Default>(p: &Path) -> Result<T> {
     if !p.exists() {
         return Ok(T::default());
     }
-    let data = std::fs::read(p).with_context(|| format!("{} lesen", p.display()))?;
-    serde_json::from_slice(&data).with_context(|| format!("{} ist beschädigt", p.display()))
+    let data = std::fs::read(p).with_context(|| tr!("{} lesen", "Reading {}", p.display()))?;
+    serde_json::from_slice(&data).with_context(|| tr!("{} ist beschädigt", "{} is damaged", p.display()))
 }
 
 /// Atomic JSON write (write temp file, then rename).
@@ -91,7 +92,7 @@ pub fn write_json<T: Serialize>(p: &Path, value: &T) -> Result<()> {
     }
     let tmp = p.with_extension("json.tmp");
     std::fs::write(&tmp, serde_json::to_vec_pretty(value)?)?;
-    std::fs::rename(&tmp, p).with_context(|| format!("{} schreiben", p.display()))?;
+    std::fs::rename(&tmp, p).with_context(|| tr!("{} schreiben", "Writing {}", p.display()))?;
     Ok(())
 }
 
@@ -140,6 +141,7 @@ pub fn dir_size(p: &Path) -> u64 {
 }
 
 /// Runs a command without flashing a console window.
+#[allow(dead_code)]
 pub fn hidden_command(program: &str) -> std::process::Command {
     #[allow(unused_mut)]
     let mut cmd = std::process::Command::new(program);

@@ -15,19 +15,20 @@ import { KeybindsPage } from "./pages/KeybindsPage";
 import { McmPage } from "./pages/McmPage";
 import { LiveMapPage } from "./pages/LiveMapPage";
 import { VanillaDialog } from "./components/VanillaDialog";
+import { t } from "./i18n";
 
 export function useInstall() {
   const { run, setState, toast, setOptionsFor, setSelectedMod } = useStore();
   return async (paths: string[]) => {
     if (paths.length === 0) return;
     const r = await run(() => api.addMods(paths), {
-      busy: paths.length === 1 ? "Mod wird installiert …" : `${paths.length} Mods werden installiert …`,
+      busy: paths.length === 1 ? t("Mod wird installiert …") : t("{n} Mods werden installiert …", { n: paths.length }),
     });
     if (!r) return;
     setState(r.state);
     r.errors.forEach((e) => toast("error", e));
     if (r.added.length) {
-      toast("success", r.added.length === 1 ? "Mod installiert – zum Aktivieren „Anwenden“ klicken." : `${r.added.length} Mods installiert.`);
+      toast("success", r.added.length === 1 ? t("Mod installiert – zum Aktivieren „Anwenden“ klicken.") : t("{n} Mods installiert.", { n: r.added.length }));
       setSelectedMod(r.added[r.added.length - 1]);
       const setup = r.state.mods.find((m) => r.added.includes(m.id) && m.needsSetup);
       if (setup) setOptionsFor(setup.id);
@@ -64,7 +65,7 @@ export default function App() {
   if (!state) {
     return (
       <div className="flex h-full items-center justify-center text-muted">
-        <Loader2 className="mr-3 animate-spin text-accent" /> Lade …
+        <Loader2 className="mr-3 animate-spin text-accent" /> {t("Lade …")}
       </div>
     );
   }

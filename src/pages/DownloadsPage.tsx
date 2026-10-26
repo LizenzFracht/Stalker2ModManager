@@ -3,6 +3,7 @@ import { CheckCircle2, Download as DownloadIcon, ExternalLink, FolderOpen, Link2
 import { api, NEXUS_GAME_URL } from "../api";
 import { useStore } from "../store";
 import { Badge, Button, Empty, IconButton, Input, Progress, formatBytes } from "../components/ui";
+import { t } from "../i18n";
 
 export function DownloadsPage() {
   const { state, downloads, run, setPage } = useStore();
@@ -15,24 +16,23 @@ export function DownloadsPage() {
       <div className="mx-auto max-w-4xl px-8 py-7">
         <div className="flex items-start gap-4">
           <div className="flex-1">
-            <h1 className="font-display text-3xl font-semibold tracking-wide">Downloads</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-wide">{t("Downloads")}</h1>
             <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-              Klicke auf Nexus Mods bei einer Datei auf <strong className="text-text">„Mod Manager Download“</strong> – S2MM lädt sie
-              herunter und installiert sie automatisch. Updates ersetzen die vorhandene Mod und behalten Reihenfolge und Optionen bei.
+              {t("Klicke auf Nexus Mods bei einer Datei auf")} <strong className="text-text">{t("„Mod Manager Download“")}</strong> {t("– S2MM lädt sie herunter und installiert sie automatisch. Updates ersetzen die vorhandene Mod und behalten Reihenfolge und Optionen bei.")}
             </p>
           </div>
           <Button icon={<ExternalLink size={15} />} onClick={() => run(() => api.openUrl(`${NEXUS_GAME_URL}/mods/`))}>
-            Nexus öffnen
+            {t("Nexus öffnen")}
           </Button>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <Status ok={connected} label="Nexus-Konto" detail={state.nexusUser ? `${state.nexusUser.name}${state.nexusUser.isPremium ? " · Premium" : ""}` : connected ? "Schlüssel hinterlegt" : "Nicht verbunden"} />
-          <Status ok={state.settings.nxmHandler} label="nxm-Links" detail={state.settings.nxmHandler ? "S2MM öffnet „Mod Manager Download“" : "Nicht als Handler registriert"} />
+          <Status ok={connected} label={t("Nexus-Konto")} detail={state.nexusUser ? `${state.nexusUser.name}${state.nexusUser.isPremium ? " · Premium" : ""}` : connected ? t("Schlüssel hinterlegt") : t("Nicht verbunden")} />
+          <Status ok={state.settings.nxmHandler} label={t("nxm-Links")} detail={state.settings.nxmHandler ? t("S2MM öffnet „Mod Manager Download“") : t("Nicht als Handler registriert")} />
         </div>
         {(!connected || !state.settings.nxmHandler) && (
           <Button className="mt-3" size="sm" onClick={() => setPage("settings")}>
-            In den Einstellungen einrichten
+            {t("In den Einstellungen einrichten")}
           </Button>
         )}
 
@@ -42,7 +42,7 @@ export function DownloadsPage() {
             <Input
               value={link}
               onChange={(e) => setLink(e.target.value)}
-              placeholder="nxm://stalker2heartofchornobyl/mods/…  (Link manuell einfügen)"
+              placeholder={t("nxm://stalker2heartofchornobyl/mods/…  (Link manuell einfügen)")}
               className="pl-9 font-mono text-xs"
             />
           </div>
@@ -53,14 +53,14 @@ export function DownloadsPage() {
               setLink("");
             }}
           >
-            Herunterladen
+            {t("Herunterladen")}
           </Button>
         </div>
 
         <div className="mt-6">
           {downloads.length === 0 ? (
-            <Empty icon={<DownloadIcon size={40} />} title="Keine Downloads">
-              Downloads aus dieser Sitzung erscheinen hier.
+            <Empty icon={<DownloadIcon size={40} />} title={t("Keine Downloads")}>
+              {t("Downloads aus dieser Sitzung erscheinen hier.")}
             </Empty>
           ) : (
             <ul className="space-y-2">
@@ -75,20 +75,20 @@ export function DownloadsPage() {
                       </div>
                     </div>
                     {d.state === "running" && <span className="font-mono text-xs text-muted">{formatBytes(d.received)}{d.total ? ` / ${formatBytes(d.total)}` : ""}</span>}
-                    {d.state === "done" && <Badge tone="accent">Heruntergeladen</Badge>}
-                    {d.state === "installed" && <Badge tone="ok"><CheckCircle2 size={11} /> Installiert</Badge>}
-                    {d.state === "failed" && <Badge tone="danger"><XCircle size={11} /> Fehler</Badge>}
+                    {d.state === "done" && <Badge tone="accent">{t("Heruntergeladen")}</Badge>}
+                    {d.state === "installed" && <Badge tone="ok"><CheckCircle2 size={11} /> {t("Installiert")}</Badge>}
+                    {d.state === "failed" && <Badge tone="danger"><XCircle size={11} /> {t("Fehler")}</Badge>}
                     {(d.state === "done" || d.state === "failed") && d.received > 0 && (
-                      <Button size="sm" variant={d.state === "done" ? "primary" : "secondary"} onClick={() => run(() => api.installDownload(d.id), { busy: "Installiere …" })}>
-                        Installieren
+                      <Button size="sm" variant={d.state === "done" ? "primary" : "secondary"} onClick={() => run(() => api.installDownload(d.id), { busy: t("Installiere …") })}>
+                        {t("Installieren")}
                       </Button>
                     )}
                     {d.state !== "running" && (
                       <>
-                        <IconButton label="Download-Ordner öffnen" onClick={() => run(() => api.openLocation("downloads"))}>
+                        <IconButton label={t("Download-Ordner öffnen")} onClick={() => run(() => api.openLocation("downloads"))}>
                           <FolderOpen size={15} />
                         </IconButton>
-                        <IconButton label="Aus Liste entfernen und Datei löschen" onClick={() => run(() => api.removeDownload(d.id, true))}>
+                        <IconButton label={t("Aus Liste entfernen und Datei löschen")} onClick={() => run(() => api.removeDownload(d.id, true))}>
                           <Trash2 size={15} />
                         </IconButton>
                       </>

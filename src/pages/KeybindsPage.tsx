@@ -6,6 +6,7 @@ import { comboId } from "../keys";
 import { KeyCapture, KeyChip } from "../components/KeyCapture";
 import { Badge, Empty, IconButton } from "../components/ui";
 import type { Binding } from "../types";
+import { t } from "../i18n";
 
 const sourceLabel: Record<Binding["source"], { label: string; tone: "neutral" | "info" | "accent" | "ok" }> = {
   ue4ss: { label: "UE4SS", tone: "info" },
@@ -54,7 +55,7 @@ export function KeybindsPage() {
     if (l) {
       setList(l);
       await refresh();
-      toast("success", b.source === "mcm" ? "Taste in den MCM-Einstellungen gespeichert." : "Taste geändert – zum Übernehmen ins Spiel „Anwenden“ klicken.");
+      toast("success", b.source === "mcm" ? t("Taste in den MCM-Einstellungen gespeichert.") : t("Taste geändert – zum Übernehmen ins Spiel „Anwenden“ klicken."));
     }
   };
 
@@ -63,10 +64,9 @@ export function KeybindsPage() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-4xl px-8 py-7">
-        <h1 className="font-display text-3xl font-semibold tracking-wide">Tastenbelegung</h1>
+        <h1 className="font-display text-3xl font-semibold tracking-wide">{t("Tastenbelegung")}</h1>
         <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-          Alle Tasten, die deine Mods belegen: UE4SS-Lua-Mods (<code className="font-mono text-text">RegisterKeyBind</code>), Hotkeys in
-          Konfigurationsdateien und Tasten aus dem Mod Configuration Menu. Änderungen werden direkt in die Datei der Mod geschrieben.
+          {t("Alle Tasten, die deine Mods belegen: UE4SS-Lua-Mods (")}<code className="font-mono text-text">RegisterKeyBind</code>{t("), Hotkeys in Konfigurationsdateien und Tasten aus dem Mod Configuration Menu. Änderungen werden direkt in die Datei der Mod geschrieben.")}
         </p>
 
         <div className="mt-5 flex items-center gap-3">
@@ -75,27 +75,27 @@ export function KeybindsPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Mod, Aktion oder Taste"
-              aria-label="Tasten durchsuchen"
+              placeholder={t("Mod, Aktion oder Taste")}
+              aria-label={t("Tasten durchsuchen")}
               className="h-9 w-full rounded-md border border-line-strong bg-bg pl-9 pr-3 text-sm placeholder:text-dim focus:border-accent focus:outline-none"
             />
           </div>
           <label className="flex items-center gap-2 text-sm text-muted">
             <input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} className="accent-[var(--color-accent)]" />
-            Nur aktive Mods
+            {t("Nur aktive Mods")}
           </label>
           {modConflicts > 0 && (
             <span className="ml-auto flex items-center gap-1.5 text-sm text-danger">
-              <AlertTriangle size={15} /> {modConflicts} doppelt belegte Taste{modConflicts === 1 ? "" : "n"}
+              <AlertTriangle size={15} /> {modConflicts === 1 ? t("1 doppelt belegte Taste") : t("{n} doppelt belegte Tasten", { n: modConflicts })}
             </span>
           )}
         </div>
 
         {list === null ? (
-          <p className="mt-8 text-sm text-muted">Durchsuche Mods …</p>
+          <p className="mt-8 text-sm text-muted">{t("Durchsuche Mods …")}</p>
         ) : groups.length === 0 || list.every((b) => b.source === "game") ? (
-          <Empty icon={<Keyboard size={44} />} title="Keine Mod-Tasten gefunden">
-            Sobald Mods Tasten über UE4SS, Konfigurationsdateien oder MCM belegen, erscheinen sie hier.
+          <Empty icon={<Keyboard size={44} />} title={t("Keine Mod-Tasten gefunden")}>
+            {t("Sobald Mods Tasten über UE4SS, Konfigurationsdateien oder MCM belegen, erscheinen sie hier.")}
           </Empty>
         ) : null}
 
@@ -104,7 +104,7 @@ export function KeybindsPage() {
             <section key={mod}>
               <h2 className="mb-2 flex items-center gap-2 text-sm font-medium">
                 {mod}
-                {items[0].source === "game" && <span className="text-xs font-normal text-dim">– nur zur Konfliktprüfung</span>}
+                {items[0].source === "game" && <span className="text-xs font-normal text-dim">{t("– nur zur Konfliktprüfung")}</span>}
               </h2>
               <div className="divide-y divide-line rounded-lg border border-line bg-panel">
                 {items.map((b) => {
@@ -121,14 +121,14 @@ export function KeybindsPage() {
                         )}
                         {others.length > 0 && (
                           <div className="mt-0.5 text-xs text-danger">
-                            Auch belegt von: {others.map((o) => `${o.modName} (${o.action})`).join(", ")}
+                            {t("Auch belegt von:")} {others.map((o) => `${o.modName} (${o.action})`).join(", ")}
                           </div>
                         )}
                       </div>
-                      <Badge tone={sourceLabel[b.source].tone}>{sourceLabel[b.source].label}</Badge>
+                      <Badge tone={sourceLabel[b.source].tone}>{t(sourceLabel[b.source].label)}</Badge>
                       <KeyChip k={b.key} modifiers={b.modifiers} />
                       {b.editable ? (
-                        <IconButton label="Taste ändern" onClick={() => setEditing(b)}>
+                        <IconButton label={t("Taste ändern")} onClick={() => setEditing(b)}>
                           <Pencil size={14} />
                         </IconButton>
                       ) : (

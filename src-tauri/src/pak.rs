@@ -1,6 +1,8 @@
 //! Minimal readers for Unreal Engine 5 pak (v10/v11) and IoStore (.utoc) directory
 //! indexes. We only need the list of contained asset paths for conflict detection.
 
+use crate::tr;
+
 use anyhow::{bail, Context, Result};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -20,7 +22,7 @@ impl<'a> Cur<'a> {
     }
     fn take(&mut self, n: usize) -> Result<&'a [u8]> {
         if self.p + n > self.b.len() {
-            bail!("Index abgeschnitten");
+            bail!(tr!("Index abgeschnitten", "Index truncated"));
         }
         let s = &self.b[self.p..self.p + n];
         self.p += n;
@@ -72,14 +74,14 @@ fn clean_mount(mount: &str) -> String {
 }
 
 pub fn list_pak(path: &Path) -> Result<Vec<String>> {
-    let mut f = File::open(path).with_context(|| format!("{} öffnen", path.display()))?;
+    let mut f = File::open(path).with_context(|| tr!("{} öffnen", "Opening {}", path.display()))?;
     let size = f.metadata()?.len();
     let tail_len = size.min(512) as usize;
     let tail = read_at(&mut f, size - tail_len as u64, tail_len)?;
     let pos = tail
         .windows(4)
         .rposition(|w| u32::from_le_bytes([w[0], w[1], w[2], w[3]]) == PAK_MAGIC)
-        .context("Keine gültige .pak-Datei")?;
+        .context(tr!("Keine gültige .pak-Datei", "Not a valid .pak file"))?;
     let mut c = Cur::new(&tail[pos..]);
     c.u32()?;
     let version = c.u32()?;
@@ -87,7 +89,7 @@ pub fn list_pak(path: &Path) -> Result<Vec<String>> {
     let index_size = c.u64()?;
     let encrypted = pos > 0 && tail[pos - 1] == 1;
     if encrypted {
-        bail!("Pak-Index ist verschlüsselt");
+        bail!(tr!("Pak-Index ist verschlüsselt", "The pak index is encrypted"));
     }
     if version < 10 {
         return list_pak_legacy(&mut f, version, index_offset, index_size);
@@ -153,9 +155,9 @@ fn list_pak_legacy(f: &mut File, version: u32, offset: u64, size: u64) -> Result
 }
 
 pub fn list_utoc(path: &Path) -> Result<Vec<String>> {
-    let data = std::fs::read(path).with_context(|| format!("{} lesen", path.display()))?;
+    let data = std::fs::read(path).with_context(|| tr!("{} lesen", "Reading {}", path.display()))?;
     if data.len() < 144 || &data[..16] != b"-==--==--==--==-" {
-        bail!("Keine gültige .utoc-Datei");
+        bail!(tr!("Keine gültige .utoc-Datei", "Not a valid .utoc file"));
     }
     let version = data[16];
     let mut c = Cur::new(&data[20..]);
@@ -178,7 +180,7 @@ pub fn list_utoc(path: &Path) -> Result<Vec<String>> {
         return Ok(Vec::new());
     }
     if flags & ENCRYPTED != 0 {
-        bail!("IoStore-Container ist verschlüsselt");
+        bail!(tr!("IoStore-Container ist verschlüsselt", "The IoStore container is encrypted"));
     }
 
     let mut p = header_size + entry_count * 12 + entry_count * 10;
@@ -195,7 +197,7 @@ pub fn list_utoc(path: &Path) -> Result<Vec<String>> {
     }
     let end = p + dir_index_size;
     if end > data.len() {
-        bail!("IoStore-Verzeichnisindex abgeschnitten");
+        bail!(tr!("IoStore-Verzeichnisindex abgeschnitten", "IoStore directory index truncated"));
     }
     let mut c = Cur::new(&data[p..end]);
     let mount = clean_mount(&c.fstring()?);
@@ -223,7 +225,7 @@ pub fn list_utoc(path: &Path) -> Result<Vec<String>> {
     while let Some((d, prefix)) = stack.pop() {
         guard += 1;
         if guard > dirs.len() + 1 {
-            bail!("IoStore-Verzeichnisindex fehlerhaft");
+            bail!(tr!("IoStore-Verzeichnisindex fehlerhaft", "IoStore directory index is corrupt"));
         }
         let Some(&(dname, first_child, _next, first_file)) = dirs.get(d as usize) else {
             continue;
@@ -261,11 +263,11 @@ pub fn list_assets(path: &Path) -> Result<Vec<String>> {
 mod tests {
     use super::*;
 
-    const PAKS: &str = "C:/Program Files (x86)/Steam/steamapps/common/S.T.A.L.K.E.R. 2 Heart of Chornobyl/Stalker2/Content/Paks";
-
+    /// Set S2MM_GAME_PAKS to `<game>/Stalker2/Content/Paks` to test against real game files.
     #[test]
     fn reads_game_pak_and_utoc() {
-        let dir = Path::new(PAKS);
+        let Some(dir) = std::env::var_os("S2MM_GAME_PAKS") else { return };
+        let dir = Path::new(&dir);
         if !dir.exists() {
             return;
         }

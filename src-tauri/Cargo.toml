@@ -2,11 +2,19 @@
 name = "stalker2mm"
 version = "0.1.0"
 description = "Stalker 2 Mod Manager"
+license = "MIT"
+repository = "https://github.com/LizenzFracht/Stalker2ModManager"
 edition = "2021"
 
 [lib]
 name = "stalker2mm_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+default = []
+# Nexus Mods API (login, nxm:// downloads, update checks). Public builds keep it off
+# until S2MM is registered with Nexus Mods (see README).
+nexus = []
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -28,8 +36,10 @@ roxmltree = "0.20"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 futures-util = "0.3"
 tokio = { version = "1", features = ["fs", "io-util", "net", "macros", "sync"] }
-winreg = "0.55"
 uesave = "0.7"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
 
 [profile.release]
 codegen-units = 1

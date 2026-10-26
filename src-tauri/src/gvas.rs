@@ -2,6 +2,8 @@
 //! The save is converted to JSON (values separated from type schemas), edited by JSON
 //! pointer and written back byte-exact for untouched data.
 
+use crate::tr;
+
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -45,7 +47,7 @@ pub struct Edit {
 
 /// `%LOCALAPPDATA%\Stalker2\Saved\SaveGames` — where MCM and other mods keep their saves.
 pub fn save_dir() -> Option<PathBuf> {
-    Some(PathBuf::from(std::env::var("LOCALAPPDATA").ok()?).join("Stalker2/Saved/SaveGames"))
+    Some(crate::game::local_appdata()?.join("Stalker2/Saved/SaveGames"))
 }
 
 pub fn list() -> Vec<SaveFileInfo> {
@@ -73,18 +75,18 @@ pub fn list() -> Vec<SaveFileInfo> {
 }
 
 pub fn load(path: &Path) -> Result<Value> {
-    let bytes = std::fs::read(path).with_context(|| format!("{} lesen", path.display()))?;
+    let bytes = std::fs::read(path).with_context(|| tr!("{} lesen", "Reading {}", path.display()))?;
     let save = uesave::SaveReader::new()
         .error_to_raw(true)
         .read(std::io::Cursor::new(&bytes))
-        .map_err(|e| anyhow!("SaveGame nicht lesbar: {e}"))?;
+        .map_err(|e| anyhow!(tr!("SaveGame nicht lesbar: {e}", "Cannot read SaveGame: {e}", e = e)))?;
     Ok(serde_json::to_value(&save)?)
 }
 
 pub fn write(path: &Path, json: &Value) -> Result<()> {
-    let save: uesave::Save = serde_json::from_value(json.clone()).context("SaveGame-Daten ungültig")?;
+    let save: uesave::Save = serde_json::from_value(json.clone()).context(tr!("SaveGame-Daten ungültig", "Invalid SaveGame data"))?;
     let mut out = Vec::new();
-    save.write(&mut out).map_err(|e| anyhow!("SaveGame schreiben: {e}"))?;
+    save.write(&mut out).map_err(|e| anyhow!(tr!("SaveGame schreiben: {e}", "Writing SaveGame: {e}", e = e)))?;
     let backup = path.with_extension("sav.s2mm-backup");
     if path.exists() && !backup.exists() {
         std::fs::copy(path, &backup)?;
@@ -98,14 +100,14 @@ pub fn write(path: &Path, json: &Value) -> Result<()> {
 pub fn apply_edits(path: &Path, edits: &[Edit]) -> Result<()> {
     let mut json = load(path)?;
     for e in edits {
-        let slot = json.pointer_mut(&e.pointer).ok_or_else(|| anyhow!("Eintrag {} nicht gefunden", e.pointer))?;
+        let slot = json.pointer_mut(&e.pointer).ok_or_else(|| anyhow!(tr!("Eintrag {} nicht gefunden", "Entry {} not found", e.pointer)))?;
         // Keep the JSON type so the schema still matches.
         let ok = matches!(
             (&*slot, &e.value),
             (Value::Bool(_), Value::Bool(_)) | (Value::String(_), Value::String(_)) | (Value::Number(_), Value::Number(_))
         );
         if !ok {
-            bail!("Typ von {} darf nicht geändert werden", e.pointer);
+            bail!(tr!("Typ von {} darf nicht geändert werden", "The type of {} cannot be changed", e.pointer));
         }
         if slot.is_i64() || slot.is_u64() {
             let n = e.value.as_f64().unwrap_or(0.0).round();
@@ -169,7 +171,7 @@ fn walk(v: &Value, pointer: &str, path: &mut Vec<String>, out: &mut Vec<Leaf>) {
                     if clean_name(k).eq_ignore_ascii_case("KeyName") {
                         out.push(Leaf {
                             pointer: format!("{pointer}/{}", escape(k)),
-                            label: path.last().cloned().unwrap_or_else(|| "Taste".into()),
+                            label: path.last().cloned().unwrap_or_else(|| tr!("Taste", "Key")),
                             path: path[..path.len().saturating_sub(1)].to_vec(),
                             kind: "key".into(),
                             value: Value::String(s.clone()),
@@ -224,7 +226,7 @@ pub fn view(json: &Value) -> SaveView {
 pub fn restore_backup(path: &Path) -> Result<()> {
     let backup = path.with_extension("sav.s2mm-backup");
     if !backup.exists() {
-        bail!("Keine Sicherung vorhanden");
+        bail!(tr!("Keine Sicherung vorhanden", "No backup available"));
     }
     std::fs::copy(&backup, path)?;
     std::fs::remove_file(&backup)?;

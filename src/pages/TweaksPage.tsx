@@ -5,6 +5,7 @@ import { api } from "../api";
 import { useStore } from "../store";
 import { Badge, Button, IconButton, Modal, SectionTitle, Toggle, confirmDialog } from "../components/ui";
 import type { TweakState } from "../types";
+import { t } from "../i18n";
 
 type Def =
   | { key: string; label: string; desc: string; kind: "toggle"; on: string }
@@ -51,14 +52,14 @@ export function TweaksPage() {
   const [custom, setCustom] = useState<{ key: string; value: string }[]>([]);
   const [importing, setImporting] = useState(false);
 
-  const load = (t: TweakState) => {
-    setTw(t);
-    setDraft({ ...t.values });
-    setCustom(Object.entries(t.values).filter(([k]) => !known.has(k.toLowerCase())).map(([key, value]) => ({ key, value })));
+  const load = (ts: TweakState) => {
+    setTw(ts);
+    setDraft({ ...ts.values });
+    setCustom(Object.entries(ts.values).filter(([k]) => !known.has(k.toLowerCase())).map(([key, value]) => ({ key, value })));
   };
 
   useEffect(() => {
-    run(() => api.getTweaks()).then((t) => t && load(t));
+    run(() => api.getTweaks()).then((ts) => ts && load(ts));
   }, [run]);
 
   const get = (key: string) => {
@@ -87,11 +88,11 @@ export function TweaksPage() {
   }, [draft, custom, tw]);
   const dirty = Object.keys(changes).length > 0;
 
-  if (!tw) return <p className="p-8 text-sm text-muted">Lade Engine.ini …</p>;
+  if (!tw) return <p className="p-8 text-sm text-muted">{t("Lade Engine.ini …")}</p>;
 
   const save = async () => {
-    const t = await run(() => api.setTweaks(changes), { success: "Engine.ini gespeichert – wirkt beim nächsten Spielstart." });
-    if (t) load(t);
+    const ts = await run(() => api.setTweaks(changes), { success: t("Engine.ini gespeichert – wirkt beim nächsten Spielstart.") });
+    if (ts) load(ts);
   };
 
   return (
@@ -99,20 +100,18 @@ export function TweaksPage() {
       <div className="mx-auto max-w-4xl px-8 py-7">
         <div className="flex items-start gap-4">
           <div className="flex-1">
-            <h1 className="font-display text-3xl font-semibold tracking-wide">Spiel-Tweaks</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-wide">{t("Spiel-Tweaks")}</h1>
             <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-              Einstellungen in <code className="font-mono text-text">Engine.ini</code> → <code className="font-mono text-text">[SystemSettings]</code>.
-              Ausgeschaltete Tweaks werden aus der Datei entfernt, dann gilt wieder der Spielstandard. Vor der ersten Änderung legt S2MM
-              eine Sicherung an.
+              {t("Einstellungen in")} <code className="font-mono text-text">Engine.ini</code> → <code className="font-mono text-text">{t("[SystemSettings]")}</code>{t(". Ausgeschaltete Tweaks werden aus der Datei entfernt, dann gilt wieder der Spielstandard. Vor der ersten Änderung legt S2MM eine Sicherung an.")}
             </p>
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-md border border-line bg-panel px-3.5 py-2.5 text-xs">
           <span className="min-w-0 flex-1 truncate font-mono text-muted" title={tw.configDir ?? ""}>{tw.configDir ?? "Konfigurationsordner unbekannt"}</span>
-          {!tw.engineIniExists && <Badge tone="accent">Engine.ini wird neu angelegt</Badge>}
-          {tw.readOnly && <Badge tone="info">schreibgeschützt</Badge>}
+          {!tw.engineIniExists && <Badge tone="accent">{t("Engine.ini wird neu angelegt")}</Badge>}
+          {tw.readOnly && <Badge tone="info">{t("schreibgeschützt")}</Badge>}
           <Button size="sm" variant="ghost" icon={<FolderOpen size={14} />} onClick={() => run(() => api.openLocation("config"))}>
-            Öffnen
+            {t("Öffnen")}
           </Button>
           <Button
             size="sm"
@@ -124,10 +123,10 @@ export function TweaksPage() {
               if (path) await run(() => api.exportEngineIni(path), { success: "Engine.ini exportiert." });
             }}
           >
-            Export
+            {t("Export")}
           </Button>
           <Button size="sm" variant="ghost" icon={<FileUp size={14} />} onClick={() => setImporting(true)}>
-            Import
+            {t("Import")}
           </Button>
           {tw.backupExists && (
             <Button
@@ -135,27 +134,27 @@ export function TweaksPage() {
               variant="ghost"
               icon={<History size={14} />}
               onClick={async () => {
-                if (!(await confirmDialog("Engine.ini auf den Stand vor der ersten Änderung durch S2MM zurücksetzen?", "Zurücksetzen"))) return;
-                const t = await run(() => api.restoreTweaks(), { success: "Original-Engine.ini wiederhergestellt." });
-                if (t) load(t);
+                if (!(await confirmDialog(t("Engine.ini auf den Stand vor der ersten Änderung durch S2MM zurücksetzen?"), t("Zurücksetzen")))) return;
+                const ts = await run(() => api.restoreTweaks(), { success: t("Original-Engine.ini wiederhergestellt.") });
+                if (ts) load(ts);
               }}
             >
-              Original wiederherstellen
+              {t("Original wiederherstellen")}
             </Button>
           )}
         </div>
 
         {CATALOG.map((cat) => (
           <section key={cat.title} className="mt-8">
-            <SectionTitle>{cat.title}</SectionTitle>
+            <SectionTitle>{t(cat.title)}</SectionTitle>
             <div className="divide-y divide-line rounded-lg border border-line bg-panel">
               {cat.items.map((d) => {
                 const value = get(d.key);
                 return (
                   <div key={d.key} className="flex items-center gap-4 px-4 py-3.5">
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">{d.label}</div>
-                      <div className="mt-0.5 text-xs leading-relaxed text-muted">{d.desc}</div>
+                      <div className="text-sm font-medium">{t(d.label)}</div>
+                      <div className="mt-0.5 text-xs leading-relaxed text-muted">{t(d.desc)}</div>
                       <div className="mt-1 font-mono text-[10.5px] text-dim">{d.key}</div>
                     </div>
                     {d.kind === "toggle" ? (
@@ -163,7 +162,7 @@ export function TweaksPage() {
                     ) : (
                       <div className="flex items-center gap-2">
                         {value === null ? (
-                          <Button size="sm" onClick={() => set(d.key, String(d.suggest))}>Setzen</Button>
+                          <Button size="sm" onClick={() => set(d.key, String(d.suggest))}>{t("Setzen")}</Button>
                         ) : (
                           <>
                             <input
@@ -183,7 +182,7 @@ export function TweaksPage() {
                               className="h-8 w-20 rounded-md border border-line-strong bg-bg px-2 text-right font-mono text-xs focus:border-accent focus:outline-none"
                             />
                             {d.unit && <span className="text-xs text-dim">{d.unit}</span>}
-                            <IconButton label="Auf Spielstandard zurücksetzen" onClick={() => set(d.key, null)}>
+                            <IconButton label={t("Auf Spielstandard zurücksetzen")} onClick={() => set(d.key, null)}>
                               <RotateCcw size={14} />
                             </IconButton>
                           </>
@@ -198,31 +197,31 @@ export function TweaksPage() {
         ))}
 
         <section className="mt-8">
-          <SectionTitle right={<Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => setCustom((c) => [...c, { key: "", value: "" }])}>Eintrag</Button>}>
-            Eigene Einträge
+          <SectionTitle right={<Button size="sm" variant="ghost" icon={<Plus size={14} />} onClick={() => setCustom((c) => [...c, { key: "", value: "" }])}>{t("Eintrag")}</Button>}>
+            {t("Eigene Einträge")}
           </SectionTitle>
           {custom.length === 0 ? (
-            <p className="text-xs text-dim">Weitere Konsolenvariablen (CVars) für [SystemSettings], z. B. aus Tweak-Guides.</p>
+            <p className="text-xs text-dim">{t("Weitere Konsolenvariablen (CVars) für [SystemSettings], z. B. aus Tweak-Guides.")}</p>
           ) : (
             <div className="space-y-1.5">
               {custom.map((c, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <input
                     value={c.key}
-                    placeholder="r.Beispiel"
-                    aria-label="Name"
+                    placeholder={t("r.Beispiel")}
+                    aria-label={t("Name")}
                     onChange={(e) => setCustom((l) => l.map((x, j) => (j === i ? { ...x, key: e.target.value } : x)))}
                     className="h-8 flex-1 rounded-md border border-line-strong bg-bg px-2.5 font-mono text-xs focus:border-accent focus:outline-none"
                   />
                   <span className="text-dim">=</span>
                   <input
                     value={c.value}
-                    placeholder="Wert"
-                    aria-label="Wert"
+                    placeholder={t("Wert")}
+                    aria-label={t("Wert")}
                     onChange={(e) => setCustom((l) => l.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
                     className="h-8 w-40 rounded-md border border-line-strong bg-bg px-2.5 font-mono text-xs focus:border-accent focus:outline-none"
                   />
-                  <IconButton label="Eintrag entfernen" onClick={() => setCustom((l) => l.filter((_, j) => j !== i))}>
+                  <IconButton label={t("Eintrag entfernen")} onClick={() => setCustom((l) => l.filter((_, j) => j !== i))}>
                     <Trash2 size={14} />
                   </IconButton>
                 </div>
@@ -233,14 +232,13 @@ export function TweaksPage() {
 
         {importing && (
           <Modal
-            title="Engine.ini importieren"
+            title={t("Engine.ini importieren")}
             width="max-w-lg"
             onClose={() => setImporting(false)}
-            footer={<Button variant="ghost" onClick={() => setImporting(false)}>Abbrechen</Button>}
+            footer={<Button variant="ghost" onClick={() => setImporting(false)}>{t("Abbrechen")}</Button>}
           >
             <p className="text-[13px] leading-relaxed text-muted">
-              Wähle eine .ini-Datei, z. B. aus einem Tweak-Guide oder einen früheren Export. Vor der ersten Änderung wird die aktuelle
-              Engine.ini gesichert.
+              {t("Wähle eine .ini-Datei, z. B. aus einem Tweak-Guide oder einen früheren Export. Vor der ersten Änderung wird die aktuelle Engine.ini gesichert.")}
             </p>
             <div className="mt-4 grid gap-2">
               {[
@@ -250,19 +248,19 @@ export function TweaksPage() {
                 <button
                   key={m.title}
                   onClick={async () => {
-                    const path = await openDialog({ title: "ini-Datei wählen", filters: [{ name: "INI", extensions: ["ini", "txt"] }] });
+                    const path = await openDialog({ title: t("ini-Datei wählen"), filters: [{ name: "INI", extensions: ["ini", "txt"] }] });
                     if (typeof path !== "string") return;
                     setImporting(false);
                     const r = await run(() => api.importEngineIni(path, m.replace));
                     if (r) {
                       load(r.state);
-                      toast("success", `${r.entries} Einträge importiert – wirkt beim nächsten Spielstart.`);
+                      toast("success", t("{n} Einträge importiert – wirkt beim nächsten Spielstart.", { n: r.entries }));
                     }
                   }}
                   className="rounded-lg border border-line-strong bg-raised px-4 py-3 text-left hover:border-accent/60"
                 >
-                  <div className="text-sm font-medium">{m.title}</div>
-                  <div className="mt-0.5 text-xs text-muted">{m.desc}</div>
+                  <div className="text-sm font-medium">{t(m.title)}</div>
+                  <div className="mt-0.5 text-xs text-muted">{t(m.desc)}</div>
                 </button>
               ))}
             </div>
@@ -270,20 +268,20 @@ export function TweaksPage() {
         )}
 
         <div className="sticky bottom-0 mt-8 flex items-center gap-3 border-t border-line bg-bg/95 py-4 backdrop-blur">
-          <span className="text-xs text-muted">{dirty ? `${Object.keys(changes).length} Änderung(en) nicht gespeichert` : "Alles gespeichert"}</span>
+          <span className="text-xs text-muted">{dirty ? t("{n} Änderung(en) nicht gespeichert", { n: Object.keys(changes).length }) : t("Alles gespeichert")}</span>
           <Button variant="ghost" className="ml-auto" disabled={!dirty} onClick={() => tw && load(tw)}>
-            Verwerfen
+            {t("Verwerfen")}
           </Button>
           <Button
             variant="primary"
             icon={<Save size={16} />}
             disabled={!dirty}
             onClick={() => {
-              if (Object.keys(changes).some((k) => !k.includes("."))) toast("info", "Hinweis: CVar-Namen enthalten üblicherweise einen Punkt (z. B. r.Name).");
+              if (Object.keys(changes).some((k) => !k.includes("."))) toast("info", t("Hinweis: CVar-Namen enthalten üblicherweise einen Punkt (z. B. r.Name)."));
               save();
             }}
           >
-            In Engine.ini speichern
+            {t("In Engine.ini speichern")}
           </Button>
         </div>
       </div>

@@ -6,6 +6,7 @@ mod e2e_tests;
 mod fomod;
 mod game;
 mod gvas;
+mod i18n;
 mod install;
 mod keybinds;
 mod layout;
@@ -125,6 +126,8 @@ struct ToolsView {
     ue4ss: ToolMod,
     /// UE4SS files are present in the game folder (installed by us or manually).
     ue4ss_in_game: bool,
+    /// Result of the last game start according to UE4SS.log.
+    ue4ss_log: ue4ss::LogStatus,
     live_map_mod: ToolMod,
     mcm: ToolMod,
 }
@@ -146,9 +149,9 @@ impl Core {
     }
 
     fn require_game(&self) -> Result<GameInfo> {
-        let g = self.game().ok_or_else(|| anyhow!("Kein Spielordner festgelegt"))?;
+        let g = self.game().ok_or_else(|| anyhow!(tr!("Kein Spielordner festgelegt", "No game folder set")))?;
         if !g.valid {
-            bail!("Der Spielordner {} enthält keine Stalker-2-Installation", g.path);
+            bail!(tr!("Der Spielordner {} enthält keine Stalker-2-Installation", "The folder {} does not contain Stalker 2", g.path));
         }
         Ok(g)
     }
@@ -200,6 +203,7 @@ impl Core {
             unmanaged,
             game_updated,
             nexus_user: self.nexus_user.clone(),
+            nexus_enabled: nexus::ENABLED,
             data_dir: self.paths.data.to_string_lossy().into_owned(),
             app_version: env!("CARGO_PKG_VERSION").into(),
             conflict_errors: conflicts.errors.len(),
@@ -226,6 +230,7 @@ impl Core {
         ToolsView {
             ue4ss: self.tool_mod(s.ue4ss_mod_id.as_ref(), "ue4ss"),
             ue4ss_in_game: self.game().map(|g| g.ue4ss_installed).unwrap_or(false),
+            ue4ss_log: self.game().map(|g| ue4ss::log_status(&g)).unwrap_or_default(),
             live_map_mod: self.tool_mod(s.livemap_mod_id.as_ref(), "s2mm live-map"),
             mcm: self.tool_mod(None, "mod configuration menu"),
         }
@@ -282,6 +287,7 @@ struct StateView {
     unmanaged: Vec<String>,
     game_updated: bool,
     nexus_user: Option<NexusUser>,
+    nexus_enabled: bool,
     data_dir: String,
     app_version: String,
     conflict_errors: usize,
@@ -323,7 +329,7 @@ async fn detect_games() -> Res<Vec<DetectedInstall>> {
 async fn set_game_path(core: State<'_, AppCore>, path: String, platform: Option<Platform>) -> Res<StateView> {
     with_core(&core, move |c| {
         let root = game::normalize_root(Path::new(&path))
-            .ok_or_else(|| anyhow!("In {path} wurde kein Stalker 2 gefunden (erwartet: Ordner mit „Stalker2\\Content\\Paks“)."))?;
+            .ok_or_else(|| anyhow!(tr!("In {path} wurde kein Stalker 2 gefunden (erwartet: Ordner mit „Stalker2\\Content\\Paks“).", "No Stalker 2 found in {path} (expected a folder containing “Stalker2\\Content\\Paks”).", path = path)))?;
         c.db.settings.game_path = Some(root.to_string_lossy().into_owned());
         c.db.settings.platform = platform.unwrap_or_else(|| game::guess_platform(&root));
         c.save()?;
@@ -373,15 +379,15 @@ async fn open_location(app: AppHandle, core: State<'_, AppCore>, what: String) -
                 std::fs::create_dir_all(&p)?;
                 p
             }
-            "config" => PathBuf::from(c.game().and_then(|g| g.config_dir).ok_or_else(|| anyhow!("Konfigurationsordner unbekannt"))?),
+            "config" => PathBuf::from(c.game().and_then(|g| g.config_dir).ok_or_else(|| anyhow!(tr!("Konfigurationsordner unbekannt", "Config folder unknown")))?),
             "data" => c.paths.data.clone(),
             "downloads" => c.paths.downloads.clone(),
             other => match other.strip_prefix("mod:") {
                 Some(id) => {
-                    let e = c.db.find_mod(id).ok_or_else(|| anyhow!("Mod nicht gefunden"))?;
+                    let e = c.db.find_mod(id).ok_or_else(|| anyhow!(tr!("Mod nicht gefunden", "Mod not found")))?;
                     util::join_rel(&plan::mod_files_dir(&c.paths.mods, id), &e.layout.root)
                 }
-                None => bail!("Unbekannter Ort"),
+                None => bail!(tr!("Unbekannter Ort", "Unknown location")),
             },
         };
         std::fs::create_dir_all(&p).ok();
@@ -394,7 +400,7 @@ async fn open_location(app: AppHandle, core: State<'_, AppCore>, what: String) -
 #[tauri::command]
 async fn open_url(app: AppHandle, url: String) -> Res<()> {
     if !(url.starts_with("https://") || url.starts_with("http://")) {
-        return Err("Ungültige URL".into());
+        return Err(tr!("Ungültige URL", "Invalid URL"));
     }
     app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())
 }
@@ -458,7 +464,7 @@ async fn remove_mod(core: State<'_, AppCore>, id: String) -> Res<StateView> {
         c.save()?;
         let dir = c.paths.mods.join(&id);
         if dir.exists() {
-            std::fs::remove_dir_all(&dir).with_context(|| format!("{} löschen", dir.display()))?;
+            std::fs::remove_dir_all(&dir).with_context(|| tr!("{} löschen", "Deleting {}", dir.display()))?;
         }
         Ok(c.state_view())
     })
@@ -503,7 +509,7 @@ async fn reorder_mods(core: State<'_, AppCore>, ids: Vec<String>) -> Res<StateVi
 #[tauri::command]
 async fn set_selection(core: State<'_, AppCore>, id: String, selection: BTreeMap<String, Vec<String>>) -> Res<StateView> {
     with_core(&core, move |c| {
-        let m = c.db.find_mod_mut(&id).ok_or_else(|| anyhow!("Mod nicht gefunden"))?;
+        let m = c.db.find_mod_mut(&id).ok_or_else(|| anyhow!(tr!("Mod nicht gefunden", "Mod not found")))?;
         m.selection = selection;
         m.needs_setup = false;
         c.save()?;
@@ -525,7 +531,7 @@ struct ModPatch {
 #[tauri::command]
 async fn update_mod(core: State<'_, AppCore>, id: String, patch: ModPatch) -> Res<StateView> {
     with_core(&core, move |c| {
-        let m = c.db.find_mod_mut(&id).ok_or_else(|| anyhow!("Mod nicht gefunden"))?;
+        let m = c.db.find_mod_mut(&id).ok_or_else(|| anyhow!(tr!("Mod nicht gefunden", "Mod not found")))?;
         if let Some(n) = patch.name.filter(|n| !n.trim().is_empty()) {
             m.name = n.trim().to_string();
         }
@@ -627,6 +633,18 @@ async fn restore_vanilla(core: State<'_, AppCore>, options: vanilla::VanillaOpti
     .await
 }
 
+/// Licenses of all bundled third-party components (generated, see scripts/).
+#[tauri::command]
+fn third_party_notices() -> &'static str {
+    include_str!("../../THIRD_PARTY_NOTICES.md")
+}
+
+/// The frontend reports the effective UI language (it resolves "auto").
+#[tauri::command]
+fn set_language(lang: String) {
+    i18n::set(&lang);
+}
+
 #[tauri::command]
 async fn finish_first_run(core: State<'_, AppCore>) -> Res<StateView> {
     with_core(&core, |c| {
@@ -642,7 +660,7 @@ async fn open_folder(app: AppHandle, core: State<'_, AppCore>, path: String) -> 
     // Only folders inside S2MM's data directory.
     let p = PathBuf::from(&path);
     if !p.starts_with(&core.paths.data) || !p.is_dir() {
-        return Err("Ordner nicht erlaubt".into());
+        return Err(tr!("Ordner nicht erlaubt", "Folder not allowed"));
     }
     app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
 }
@@ -719,9 +737,9 @@ async fn mod_details(core: State<'_, AppCore>, id: String) -> Res<ModDetails> {
 
 fn safe_mod_path(c: &Core, id: &str, rel: &str) -> Result<PathBuf> {
     let base = plan::mod_files_dir(&c.paths.mods, id).canonicalize()?;
-    let p = util::join_rel(&base, rel).canonicalize().context("Datei nicht gefunden")?;
+    let p = util::join_rel(&base, rel).canonicalize().context(tr!("Datei nicht gefunden", "File not found"))?;
     if !p.starts_with(&base) {
-        bail!("Ungültiger Pfad");
+        bail!(tr!("Ungültiger Pfad", "Invalid path"));
     }
     Ok(p)
 }
@@ -813,7 +831,7 @@ async fn create_profile(core: State<'_, AppCore>, name: String, copy_current: bo
 async fn rename_profile(core: State<'_, AppCore>, id: String, name: String) -> Res<StateView> {
     with_core(&core, move |c| {
         if id == model::VANILLA_ID {
-            bail!("Das Vanilla-Profil kann nicht umbenannt werden");
+            bail!(tr!("Das Vanilla-Profil kann nicht umbenannt werden", "The Vanilla profile cannot be renamed"));
         }
         if let Some(p) = c.db.profiles.iter_mut().find(|p| p.id == id) {
             p.name = name.trim().to_string();
@@ -828,10 +846,10 @@ async fn rename_profile(core: State<'_, AppCore>, id: String, name: String) -> R
 async fn delete_profile(core: State<'_, AppCore>, id: String) -> Res<StateView> {
     with_core(&core, move |c| {
         if id == model::VANILLA_ID {
-            bail!("Das Vanilla-Profil kann nicht gelöscht werden");
+            bail!(tr!("Das Vanilla-Profil kann nicht gelöscht werden", "The Vanilla profile cannot be deleted"));
         }
         if c.db.profiles.len() <= 2 {
-            bail!("Das letzte eigene Profil kann nicht gelöscht werden");
+            bail!(tr!("Das letzte eigene Profil kann nicht gelöscht werden", "Your last own profile cannot be deleted"));
         }
         c.db.profiles.retain(|p| p.id != id);
         c.db.normalize();
@@ -868,8 +886,21 @@ async fn get_tweaks(core: State<'_, AppCore>) -> Res<tweaks::TweakState> {
 #[tauri::command]
 async fn set_tweaks(core: State<'_, AppCore>, changes: BTreeMap<String, Option<String>>) -> Res<tweaks::TweakState> {
     with_core(&core, move |c| {
-        let dir = config_dir(c).ok_or_else(|| anyhow!("Konfigurationsordner unbekannt"))?;
-        tweaks::write(&dir, &changes)?;
+        let dir = config_dir(c).ok_or_else(|| anyhow!(tr!("Konfigurationsordner unbekannt", "Config folder unknown")))?;
+        tweaks::write(&dir, &changes, c.db.settings.protect_engine_ini)?;
+        Ok(tweaks::read(Some(&dir)))
+    })
+    .await
+}
+
+/// Toggles the read-only protection and applies it to the current Engine.ini at once.
+#[tauri::command]
+async fn set_engine_ini_protection(core: State<'_, AppCore>, protect: bool) -> Res<tweaks::TweakState> {
+    with_core(&core, move |c| {
+        c.db.settings.protect_engine_ini = protect;
+        c.save()?;
+        let dir = config_dir(c).ok_or_else(|| anyhow!(tr!("Konfigurationsordner unbekannt", "Config folder unknown")))?;
+        tweaks::set_readonly(&dir.join("Engine.ini"), protect)?;
         Ok(tweaks::read(Some(&dir)))
     })
     .await
@@ -878,7 +909,7 @@ async fn set_tweaks(core: State<'_, AppCore>, changes: BTreeMap<String, Option<S
 #[tauri::command]
 async fn restore_tweaks(core: State<'_, AppCore>) -> Res<tweaks::TweakState> {
     with_core(&core, |c| {
-        let dir = config_dir(c).ok_or_else(|| anyhow!("Konfigurationsordner unbekannt"))?;
+        let dir = config_dir(c).ok_or_else(|| anyhow!(tr!("Konfigurationsordner unbekannt", "Config folder unknown")))?;
         tweaks::restore(&dir)?;
         Ok(tweaks::read(Some(&dir)))
     })
@@ -888,7 +919,7 @@ async fn restore_tweaks(core: State<'_, AppCore>) -> Res<tweaks::TweakState> {
 #[tauri::command]
 async fn export_engine_ini(core: State<'_, AppCore>, path: String) -> Res<()> {
     with_core(&core, move |c| {
-        let dir = config_dir(c).ok_or_else(|| anyhow!("Konfigurationsordner unbekannt"))?;
+        let dir = config_dir(c).ok_or_else(|| anyhow!(tr!("Konfigurationsordner unbekannt", "Config folder unknown")))?;
         tweaks::export(&dir, Path::new(&path))
     })
     .await
@@ -904,8 +935,8 @@ struct ImportOutcome {
 #[tauri::command]
 async fn import_engine_ini(core: State<'_, AppCore>, path: String, replace: bool) -> Res<ImportOutcome> {
     with_core(&core, move |c| {
-        let dir = config_dir(c).ok_or_else(|| anyhow!("Konfigurationsordner unbekannt"))?;
-        let entries = tweaks::import(&dir, Path::new(&path), replace)?;
+        let dir = config_dir(c).ok_or_else(|| anyhow!(tr!("Konfigurationsordner unbekannt", "Config folder unknown")))?;
+        let entries = tweaks::import(&dir, Path::new(&path), replace, c.db.settings.protect_engine_ini)?;
         Ok(ImportOutcome { entries, state: tweaks::read(Some(&dir)) })
     })
     .await
@@ -915,7 +946,7 @@ async fn import_engine_ini(core: State<'_, AppCore>, path: String, replace: bool
 
 fn api_key(core: &AppCore) -> Result<String> {
     core.lock().db.settings.nexus_api_key.clone().filter(|k| !k.trim().is_empty()).ok_or_else(|| {
-        anyhow!("Kein Nexus-API-Schlüssel hinterlegt (Einstellungen → Nexus Mods).")
+        anyhow!(tr!("Kein Nexus-API-Schlüssel hinterlegt (Einstellungen → Nexus Mods).", "No Nexus API key set (Settings → Nexus Mods)."))
     })
 }
 
@@ -1008,8 +1039,8 @@ async fn check_updates(core: State<'_, AppCore>) -> Res<StateView> {
 
 #[tauri::command]
 async fn nexus_update_mod(app: AppHandle, core: State<'_, AppCore>, id: String) -> Res<()> {
-    let entry = core.lock().db.find_mod(&id).cloned().ok_or("Mod nicht gefunden")?;
-    let nref = entry.nexus.clone().ok_or("Mod ist nicht mit Nexus verknüpft")?;
+    let entry = core.lock().db.find_mod(&id).cloned().ok_or_else(|| tr!("Mod nicht gefunden", "Mod not found"))?;
+    let nref = entry.nexus.clone().ok_or_else(|| tr!("Mod ist nicht mit Nexus verknüpft", "Mod is not linked to Nexus"))?;
     let premium = core.lock().nexus_user.as_ref().map(|u| u.is_premium).unwrap_or(false);
     let file_id = entry.update.as_ref().and_then(|u| u.latest_file_id);
     let url = format!("https://www.nexusmods.com/{}/mods/{}?tab=files", nref.game_domain, nref.mod_id);
@@ -1030,7 +1061,7 @@ async fn nexus_update_mod(app: AppHandle, core: State<'_, AppCore>, id: String) 
 async fn handle_nxm(app: AppHandle, core: State<'_, AppCore>, url: String) -> Res<()> {
     let link = nexus::parse_nxm(&url).map_err(|e| format!("{e:#}"))?;
     if link.game != game::NEXUS_DOMAIN {
-        return Err(format!("Dieser Link gehört zu einem anderen Spiel ({}).", link.game));
+        return Err(tr!("Dieser Link gehört zu einem anderen Spiel ({}).", "This link belongs to another game ({}).", link.game));
     }
     start_download(app, core.inner().clone(), link, None);
     Ok(())
@@ -1050,7 +1081,7 @@ fn start_download(app: AppHandle, core: AppCore, link: nexus::NxmLink, replace: 
                 }
             }
             emit_downloads(&app, &core);
-            notice(&app, "error", format!("Download fehlgeschlagen: {msg}"));
+            notice(&app, "error", tr!("Download fehlgeschlagen: {msg}", "Download failed: {msg}", msg = msg));
         }
     });
 }
@@ -1112,7 +1143,7 @@ async fn download_task(app: &AppHandle, core: &AppCore, id: &str, link: nexus::N
         });
     }
     emit_downloads(app, core);
-    notice(app, "info", format!("Download gestartet: {}", meta.name.clone().unwrap_or(file_name.clone())));
+    notice(app, "info", tr!("Download gestartet: {}", "Download started: {}", meta.name.clone().unwrap_or(file_name.clone())));
 
     client
         .download(&url, &dest, |received, total| {
@@ -1153,7 +1184,7 @@ async fn install_download_inner(app: &AppHandle, core: &AppCore, id: &str) -> Re
         .iter()
         .find(|d| d.id == id)
         .cloned()
-        .ok_or_else(|| anyhow!("Download nicht gefunden"))?;
+        .ok_or_else(|| anyhow!(tr!("Download nicht gefunden", "Download not found")))?;
     let c2 = core.clone();
     let meta: InstallMeta = d.meta.clone().map(Into::into).unwrap_or_default();
     let path = PathBuf::from(&d.path);
@@ -1168,8 +1199,12 @@ async fn install_download_inner(app: &AppHandle, core: &AppCore, id: &str) -> Re
     set_download_state(core, id, "installed", None);
     emit_downloads(app, core);
     let _ = app.emit("state-changed", ());
-    let verb = if d.replace.is_some() { "aktualisiert" } else { "installiert" };
-    notice(app, "success", format!("{} {verb}", entry.name));
+    let msg = if d.replace.is_some() {
+        tr!("{} aktualisiert", "{} updated", entry.name)
+    } else {
+        tr!("{} installiert", "{} installed", entry.name)
+    };
+    notice(app, "success", msg);
     Ok(())
 }
 
@@ -1215,7 +1250,7 @@ async fn ue4ss_install(core: State<'_, AppCore>) -> Res<StateView> {
             name: Some("UE4SS".into()),
             version: Some(prepared.version.clone()),
             author: Some("UE4SS-RE".into()),
-            summary: Some("Lua-Scripting-Framework für Unreal Engine – Voraussetzung für Lua-Mods und die Live-Karte.".into()),
+            summary: Some(tr!("Lua-Scripting-Framework für Unreal Engine – Voraussetzung für Lua-Mods und die Live-Karte.", "Lua scripting framework for Unreal Engine – required by Lua mods and the live map.")),
             ..Default::default()
         };
         install_one(&app2, &prepared.folder, meta, existing, true)
@@ -1246,7 +1281,7 @@ async fn set_tool_enabled(core: State<'_, AppCore>, tool: String, enabled: bool)
             "mcm" => tools.mcm.mod_id,
             _ => None,
         }
-        .ok_or_else(|| anyhow!("Nicht installiert"))?;
+        .ok_or_else(|| anyhow!(tr!("Nicht installiert", "Not installed")))?;
         if enabled {
             c.db.leave_vanilla();
         }
@@ -1277,7 +1312,7 @@ async fn livemap_install_mod(core: State<'_, AppCore>) -> Res<StateView> {
             name: Some("S2MM Live-Map".into()),
             version: Some(env!("CARGO_PKG_VERSION").into()),
             author: Some("S2MM".into()),
-            summary: Some("Schreibt die Spielerposition für die Live-Karte (benötigt UE4SS).".into()),
+            summary: Some(tr!("Schreibt die Spielerposition für die Live-Karte (benötigt UE4SS).", "Writes the player position for the live map (requires UE4SS).")),
             ..Default::default()
         };
         let entry = install_one(&app, &work, meta, existing, true)?;
@@ -1345,10 +1380,10 @@ async fn livemap_status(core: State<'_, AppCore>) -> Res<LiveStatus> {
 // ---------------------------------------------------------------- MCM / SaveGame settings
 
 fn checked_save_path(path: &str) -> Result<PathBuf> {
-    let dir = gvas::save_dir().ok_or_else(|| anyhow!("SaveGames-Ordner unbekannt"))?.canonicalize()?;
-    let p = PathBuf::from(path).canonicalize().context("Datei nicht gefunden")?;
+    let dir = gvas::save_dir().ok_or_else(|| anyhow!(tr!("SaveGames-Ordner unbekannt", "SaveGames folder unknown")))?.canonicalize()?;
+    let p = PathBuf::from(path).canonicalize().context(tr!("Datei nicht gefunden", "File not found"))?;
     if !p.starts_with(&dir) || util::ext_lower(path) != "sav" {
-        bail!("Nur .sav-Dateien im SaveGames-Ordner können bearbeitet werden");
+        bail!(tr!("Nur .sav-Dateien im SaveGames-Ordner können bearbeitet werden", "Only .sav files in the SaveGames folder can be edited"));
     }
     Ok(p)
 }
@@ -1377,7 +1412,7 @@ async fn read_save(path: String) -> Res<gvas::SaveView> {
 async fn write_save(path: String, edits: Vec<gvas::Edit>) -> Res<gvas::SaveView> {
     tauri::async_runtime::spawn_blocking(move || -> Result<gvas::SaveView> {
         if game::is_running() {
-            bail!("Bitte das Spiel schließen – es überschreibt die Einstellungen sonst beim Beenden.");
+            bail!(tr!("Bitte das Spiel schließen – es überschreibt die Einstellungen sonst beim Beenden.", "Please close the game first – it would overwrite the settings when it exits."));
         }
         let p = checked_save_path(&path)?;
         gvas::apply_edits(&p, &edits)?;
@@ -1457,13 +1492,13 @@ async fn rebind_key(core: State<'_, AppCore>, binding: keybinds::Binding, key: S
     with_core(&core, move |c| {
         if binding.source == "mcm" {
             if game::is_running() {
-                bail!("Bitte das Spiel schließen, bevor MCM-Tasten geändert werden.");
+                bail!(tr!("Bitte das Spiel schließen, bevor MCM-Tasten geändert werden.", "Please close the game before changing MCM keys."));
             }
             let p = checked_save_path(binding.file.as_deref().unwrap_or(""))?;
             gvas::apply_edits(&p, &[gvas::Edit { pointer: binding.style.clone(), value: serde_json::Value::String(key) }])?;
         } else {
-            let id = binding.mod_id.as_deref().ok_or_else(|| anyhow!("Nicht änderbar"))?;
-            let rel = binding.file.as_deref().ok_or_else(|| anyhow!("Nicht änderbar"))?;
+            let id = binding.mod_id.as_deref().ok_or_else(|| anyhow!(tr!("Nicht änderbar", "Not editable")))?;
+            let rel = binding.file.as_deref().ok_or_else(|| anyhow!(tr!("Nicht änderbar", "Not editable")))?;
             let p = safe_mod_path(c, id, rel)?;
             keybinds::rebind(&p, &binding, &key, &modifiers)?;
         }
@@ -1475,12 +1510,14 @@ async fn rebind_key(core: State<'_, AppCore>, binding: keybinds::Binding, key: S
 // ---------------------------------------------------------------- setup
 
 fn data_dir(app: &AppHandle) -> PathBuf {
-    // Portable mode: a `portable.txt` next to the exe keeps all data beside it.
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            if dir.join("portable.txt").exists() {
-                return dir.join("S2MM-Daten");
-            }
+    // Portable mode: a `portable.txt` next to the program (or the AppImage on Linux)
+    // keeps all data beside it.
+    let program = std::env::var_os("APPIMAGE").map(PathBuf::from).or_else(|| std::env::current_exe().ok());
+    if let Some(dir) = program.as_deref().and_then(Path::parent) {
+        if dir.join("portable.txt").exists() {
+            // Older builds used a German folder name.
+            let legacy = dir.join("S2MM-Daten");
+            return if legacy.is_dir() { legacy } else { dir.join("S2MM-Data") };
         }
     }
     app.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("S2MM-Daten"))
@@ -1488,10 +1525,14 @@ fn data_dir(app: &AppHandle) -> PathBuf {
 
 fn forward_nxm(app: &AppHandle, args: &[String]) {
     if let Some(url) = args.iter().find(|a| a.to_lowercase().starts_with("nxm://")) {
+        if !nexus::ENABLED {
+            notice(app, "error", tr!("Die Nexus-Mods-Anbindung ist in dieser Version deaktiviert.", "Nexus Mods integration is disabled in this version."));
+            return;
+        }
         let core = app.state::<AppCore>().inner().clone();
         match nexus::parse_nxm(url) {
             Ok(link) if link.game == game::NEXUS_DOMAIN => start_download(app.clone(), core, link, None),
-            Ok(link) => notice(app, "error", format!("Dieser Link gehört zu einem anderen Spiel ({}).", link.game)),
+            Ok(link) => notice(app, "error", tr!("Dieser Link gehört zu einem anderen Spiel ({}).", "This link belongs to another game ({}).", link.game)),
             Err(e) => notice(app, "error", format!("{e:#}")),
         }
     }
@@ -1519,6 +1560,9 @@ pub fn run() {
                 Db::default()
             });
             db.normalize();
+            if db.settings.language != "auto" {
+                i18n::set(&db.settings.language);
+            }
             if db.settings.game_path.is_none() {
                 if let Some(first) = game::detect_installs().into_iter().next() {
                     db.settings.game_path = Some(first.path);
@@ -1526,7 +1570,13 @@ pub fn run() {
                 }
             }
             let deployment: Deployment = read_json(&paths.deployment).unwrap_or_default();
-            let check_updates = db.settings.check_updates_on_start && db.settings.nexus_api_key.is_some();
+            if !nexus::ENABLED && db.settings.nxm_handler {
+                // A previous build registered nxm://; hand it back.
+                let _ = nexus::set_protocol_handler(false, db.settings.nxm_previous.as_deref());
+                db.settings.nxm_handler = false;
+                db.settings.nxm_previous = None;
+            }
+            let check_updates = nexus::ENABLED && db.settings.check_updates_on_start && db.settings.nexus_api_key.is_some();
             let core = Core { paths: paths.clone(), db, deployment, cache: PakCache::default(), nexus_user: None };
             core.save()?;
             let app_core = AppCore {
@@ -1543,9 +1593,9 @@ pub fn run() {
                 forward_nxm(&handle, &args);
                 if check_updates {
                     match check_updates_inner(&app_core).await {
-                        Ok(n) if n > 0 => notice(&handle, "info", format!("{n} Mod-Update(s) auf Nexus verfügbar")),
+                        Ok(n) if n > 0 => notice(&handle, "info", tr!("{n} Mod-Update(s) auf Nexus verfügbar", "{n} mod update(s) available on Nexus", n = n)),
                         Ok(_) => {}
-                        Err(e) => notice(&handle, "error", format!("Update-Prüfung: {e:#}")),
+                        Err(e) => notice(&handle, "error", tr!("Update-Prüfung: {e:#}", "Update check: {e:#}", e = e)),
                     }
                     let _ = handle.emit("state-changed", ());
                 }
@@ -1572,6 +1622,8 @@ pub fn run() {
             purge,
             restore_vanilla,
             finish_first_run,
+            set_language,
+            third_party_notices,
             open_folder,
             get_conflicts,
             mod_details,
@@ -1585,6 +1637,7 @@ pub fn run() {
             get_tweaks,
             set_tweaks,
             restore_tweaks,
+            set_engine_ini_protection,
             export_engine_ini,
             import_engine_ini,
             ue4ss_install,

@@ -2,6 +2,8 @@
 //! injects a small overlay script and serves the player position written by the
 //! S2MM Live-Map UE4SS mod.
 
+use crate::tr;
+
 use anyhow::{bail, Context, Result};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -36,9 +38,10 @@ pub struct LivePosition {
     pub yaw: f64,
 }
 
-/// `%LOCALAPPDATA%\S2MM` — shared with the Lua mod.
+/// `%LOCALAPPDATA%\S2MM-Live` (inside the Proton prefix on Linux) — shared with the Lua mod.
+/// Kept apart from `%LOCALAPPDATA%\S2MM`, where the Windows installer puts the program.
 pub fn live_dir() -> PathBuf {
-    PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_else(|_| ".".into())).join("S2MM")
+    crate::game::local_appdata().unwrap_or_else(|| PathBuf::from(".")).join("S2MM-Live")
 }
 
 pub fn read_position() -> LivePosition {
@@ -87,10 +90,13 @@ fn inject(html: &str) -> String {
             out.replace_range(a + 7..b, "S2MM Live-Karte – Stalker 2");
         }
     }
-    let tag = "<script src=\"/s2mm/overlay.js\"></script>";
+    let tag = format!(
+        "<script>window.__s2mmLang = \"{}\";</script><script src=\"/s2mm/overlay.js\"></script>",
+        crate::i18n::code()
+    );
     match out.rfind("</body>") {
-        Some(i) => out.insert_str(i, tag),
-        None => out.push_str(tag),
+        Some(i) => out.insert_str(i, &tag),
+        None => out.push_str(&tag),
     }
     out
 }
@@ -103,7 +109,7 @@ struct Ctx {
 async fn fetch_cached(ctx: &Ctx, path: &str) -> Result<Vec<u8>> {
     let rel = path.trim_start_matches('/');
     if rel.split('/').any(|s| s == ".." || s.contains(':')) {
-        bail!("ungültiger Pfad");
+        bail!("invalid path");
     }
     let file = crate::util::join_rel(&ctx.cache, rel);
     let fresh = std::fs::metadata(&file)
@@ -177,7 +183,7 @@ async fn handle(mut stream: TcpStream, ctx: Arc<Ctx>) -> Result<()> {
             }
             Ok(body) => respond(&mut stream, "200 OK", content_type(path), &body).await,
             Err(e) => {
-                let msg = format!("Karte nicht erreichbar ({e:#}). Beim ersten Start wird eine Internetverbindung benötigt.");
+                let msg = tr!("Karte nicht erreichbar ({e:#}). Beim ersten Start wird eine Internetverbindung benötigt.", "Map not reachable ({e:#}). An internet connection is needed on first start.", e = e);
                 respond(&mut stream, "502 Bad Gateway", "text/plain; charset=utf-8", msg.as_bytes()).await
             }
         },
@@ -187,7 +193,7 @@ async fn handle(mut stream: TcpStream, ctx: Arc<Ctx>) -> Result<()> {
 pub async fn start(port: u16, cache: &Path) -> Result<Server> {
     let listener = TcpListener::bind(("127.0.0.1", port))
         .await
-        .with_context(|| format!("Port {port} ist belegt – in den Einstellungen einen anderen wählen"))?;
+        .with_context(|| tr!("Port {port} ist belegt – in den Einstellungen einen anderen wählen", "Port {port} is in use – choose another one in the settings", port = port))?;
     std::fs::create_dir_all(cache)?;
     std::fs::create_dir_all(live_dir())?;
     let ctx = Arc::new(Ctx {
@@ -221,6 +227,7 @@ mod tests {
         let out = inject(html);
         assert!(out.contains("window.__s2mmMap = () => map;"));
         assert!(out.contains("<script src=\"/s2mm/overlay.js\"></script></body>"));
+        assert!(out.contains("window.__s2mmLang"));
         assert!(out.contains("<title>S2MM Live-Karte – Stalker 2</title>"));
     }
 }

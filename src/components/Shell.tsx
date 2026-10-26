@@ -25,6 +25,14 @@ import {
 import { api } from "../api";
 import { useStore, type Page } from "../store";
 import { Button, confirmDialog, Input, Modal, platformLabel } from "./ui";
+import { t } from "../i18n";
+
+/** Built-in profiles are shown in the UI language. */
+function profileName(id?: string, name?: string) {
+  if (id === "vanilla") return "Vanilla";
+  if (id === "default" && name === "Standard") return t("Standard");
+  return name ?? "";
+}
 
 export function Logo() {
   return (
@@ -45,21 +53,21 @@ export function Sidebar({ conflictCount }: { conflictCount: number }) {
   const groups: { title?: string; items: Item[] }[] = [
     {
       items: [
-        { id: "mods", label: "Mods", icon: Layers, count: state?.mods.length },
-        { id: "conflicts", label: "Konflikte", icon: Swords, count: conflictCount || undefined, tone: "text-accent" },
-        { id: "downloads", label: "Downloads", icon: Download, count: running || undefined, tone: "text-accent" },
+        { id: "mods", label: t("Mods"), icon: Layers, count: state?.mods.length },
+        { id: "conflicts", label: t("Konflikte"), icon: Swords, count: conflictCount || undefined, tone: "text-accent" },
+        ...(state?.nexusEnabled ? [{ id: "downloads" as Page, label: t("Downloads"), icon: Download, count: running || undefined, tone: "text-accent" }] : []),
       ],
     },
     {
-      title: "Werkzeuge",
+      title: t("Werkzeuge"),
       items: [
-        { id: "mcm", label: "Mod-Einstellungen", icon: ListChecks },
-        { id: "keybinds", label: "Tastenbelegung", icon: Keyboard },
-        { id: "livemap", label: "Live-Karte", icon: MapIcon },
-        { id: "tweaks", label: "Spiel-Tweaks", icon: SlidersHorizontal },
+        { id: "mcm", label: t("Mod-Einstellungen"), icon: ListChecks },
+        { id: "keybinds", label: t("Tastenbelegung"), icon: Keyboard },
+        { id: "livemap", label: t("Live-Karte"), icon: MapIcon },
+        { id: "tweaks", label: t("Spiel-Tweaks"), icon: SlidersHorizontal },
       ],
     },
-    { items: [{ id: "settings", label: "Einstellungen", icon: Settings }] },
+    { items: [{ id: "settings", label: t("Einstellungen"), icon: Settings }] },
   ];
   return (
     <nav className="pda-texture flex w-56 shrink-0 flex-col border-r border-line bg-panel">
@@ -67,7 +75,7 @@ export function Sidebar({ conflictCount }: { conflictCount: number }) {
         <Logo />
         <div className="leading-none">
           <div className="font-display text-2xl font-bold tracking-wider text-text">S2MM</div>
-          <div className="label-caps mt-1 text-[10.5px] text-dim">Stalker 2 Mod Manager</div>
+          <div className="label-caps mt-1 text-[10.5px] text-dim">{t("Stalker 2 Mod Manager")}</div>
         </div>
       </div>
       {groups.map((g, gi) => (
@@ -98,7 +106,7 @@ export function Sidebar({ conflictCount }: { conflictCount: number }) {
       </ul>
       ))}
       <div className="mt-auto border-t border-line px-5 py-4 text-xs text-dim">
-        {state?.nexusUser ? (
+        {!state?.nexusEnabled ? null : state?.nexusUser ? (
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-ok" />
             <span className="truncate text-muted">
@@ -109,7 +117,7 @@ export function Sidebar({ conflictCount }: { conflictCount: number }) {
         ) : (
           <button className="flex items-center gap-2 hover:text-muted" onClick={() => setPage("settings")}>
             <span className="h-2 w-2 rounded-full bg-dim" />
-            Nexus nicht verbunden
+            {t("Nexus nicht verbunden")}
           </button>
         )}
         <div className="mt-2 font-mono text-[11px]">v{state?.appVersion}</div>
@@ -145,8 +153,8 @@ function ProfileMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        <span className="label-caps text-[11px] text-dim">Profil</span>
-        <span className="max-w-40 truncate">{active?.name}</span>
+        <span className="label-caps text-[11px] text-dim">{t("Profil")}</span>
+        <span className="max-w-40 truncate">{profileName(active?.id, active?.name)}</span>
         <ChevronDown size={15} className="text-dim" />
       </button>
       {open && (
@@ -166,51 +174,51 @@ function ProfileMenu() {
                 className="flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm hover:bg-hover"
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${p.id === state.activeProfile ? "bg-accent" : "bg-transparent"}`} />
-                <span className="truncate">{p.name}</span>
-                {p.id === "vanilla" && <Lock size={13} className="ml-auto text-dim" aria-label="schreibgeschützt" />}
+                <span className="truncate">{profileName(p.id, p.name)}</span>
+                {p.id === "vanilla" && <Lock size={13} className="ml-auto text-dim" aria-label={t("schreibgeschützt")} />}
               </button>
             ))}
             <div className="my-1.5 h-px bg-line" />
             <MenuItem icon={<Plus size={15} />} onClick={() => { setOpen(false); setName(""); setDialog("new"); }}>
-              Neues Profil
+              {t("Neues Profil")}
             </MenuItem>
             <MenuItem icon={<Pencil size={15} />} disabled={state.activeProfile === "vanilla"} onClick={() => { setOpen(false); setName(active?.name ?? ""); setDialog("rename"); }}>
-              Umbenennen
+              {t("Umbenennen")}
             </MenuItem>
             <MenuItem
               icon={<Trash2 size={15} />}
               disabled={state.activeProfile === "vanilla" || state.profiles.length < 3}
               onClick={async () => {
                 setOpen(false);
-                if (!(await confirmDialog(`Profil „${active?.name}“ löschen? Die Mods selbst bleiben erhalten.`, "Löschen"))) return;
+                if (!(await confirmDialog(t("Profil „{name}“ löschen? Die Mods selbst bleiben erhalten.", { name: active?.name ?? "" }), t("Löschen")))) return;
                 const s = await run(() => api.deleteProfile(state.activeProfile));
                 if (s) setState(s);
               }}
             >
-              Profil löschen
+              {t("Profil löschen")}
             </MenuItem>
           </div>
         </>
       )}
       {dialog && (
         <Modal
-          title={dialog === "new" ? "Neues Profil" : "Profil umbenennen"}
+          title={dialog === "new" ? t("Neues Profil") : t("Profil umbenennen")}
           onClose={() => setDialog(null)}
           width="max-w-md"
           footer={
             <>
-              <Button variant="ghost" onClick={() => setDialog(null)}>Abbrechen</Button>
+              <Button variant="ghost" onClick={() => setDialog(null)}>{t("Abbrechen")}</Button>
               <Button variant="primary" onClick={submit} disabled={!name.trim()}>
                 {dialog === "new" ? "Anlegen" : "Speichern"}
               </Button>
             </>
           }
         >
-          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="z. B. Hardcore-Durchgang" />
+          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder={t("z. B. Hardcore-Durchgang")} />
           {dialog === "new" && (
             <label className="mt-3 flex items-center gap-2 text-sm text-muted">
               <input type="checkbox" checked={copy} onChange={(e) => setCopy(e.target.checked)} className="accent-[var(--color-accent)]" />
-              Aktive Mods und Reihenfolge vom aktuellen Profil übernehmen
+              {t("Aktive Mods und Reihenfolge vom aktuellen Profil übernehmen")}
             </label>
           )}
         </Modal>
@@ -239,10 +247,10 @@ export function TopBar() {
   const game = state.game;
 
   const apply = async () => {
-    const r = await run(() => api.apply(), { busy: "Mods werden angewendet …" });
+    const r = await run(() => api.apply(), { busy: t("Mods werden angewendet …") });
     if (r) {
       setState(r.state);
-      toast("success", `Angewendet: ${r.placed} Dateien platziert, ${r.removed} entfernt, ${r.kept} unverändert.`);
+      toast("success", t("Angewendet: {placed} Dateien platziert, {removed} entfernt, {kept} unverändert.", { placed: r.placed, removed: r.removed, kept: r.kept }));
     }
     return r;
   };
@@ -252,7 +260,7 @@ export function TopBar() {
       const r = await apply();
       if (!r) return;
     }
-    await run(() => api.launchGame(), { success: "Stalker 2 wird gestartet …" });
+    await run(() => api.launchGame(), { success: t("Stalker 2 wird gestartet …") });
   };
 
   return (
@@ -262,25 +270,25 @@ export function TopBar() {
         <button
           onClick={() => run(() => api.openLocation("game"))}
           className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left text-xs text-muted hover:bg-hover"
-          title="Spielordner öffnen"
+          title={t("Spielordner öffnen")}
         >
           <FolderOpen size={15} className="shrink-0 text-dim" />
-          <span className="truncate font-mono">{game.path}</span>
-          <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[10.5px] text-dim">{platformLabel[game.platform]}</span>
+          <span className="min-w-0 truncate font-mono">{game.path}</span>
+          <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[10.5px] text-dim">{t(platformLabel[game.platform])}</span>
         </button>
       )}
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         {state.pending && (
           <span className="mr-1 flex items-center gap-2 whitespace-nowrap text-xs text-accent">
             <span className="pulse-dot h-2 w-2 rounded-full bg-accent" />
-            Nicht angewendet
+            {t("Nicht angewendet")}
           </span>
         )}
         <Button variant={state.pending ? "primary" : "secondary"} icon={<Upload size={16} />} onClick={apply} disabled={!game?.valid}>
-          Anwenden
+          {t("Anwenden")}
         </Button>
         <Button variant={state.pending ? "secondary" : "primary"} icon={<Play size={16} />} onClick={launch} disabled={!game?.valid}>
-          Spiel starten
+          {t("Spiel starten")}
         </Button>
       </div>
     </header>
@@ -292,11 +300,11 @@ export function Toasts() {
   const icon = { info: <Info size={17} className="text-info" />, success: <CheckCircle2 size={17} className="text-ok" />, error: <AlertTriangle size={17} className="text-danger" /> };
   return (
     <div className="pointer-events-none fixed bottom-5 right-5 z-50 flex w-96 flex-col gap-2" aria-live="polite">
-      {toasts.map((t) => (
-        <div key={t.id} className="toast-in pointer-events-auto flex items-start gap-3 rounded-lg border border-line-strong bg-raised px-4 py-3 shadow-xl">
-          <span className="mt-0.5">{icon[t.kind]}</span>
-          <p className="flex-1 whitespace-pre-line text-sm leading-snug">{t.message}</p>
-          <button aria-label="Schließen" onClick={() => dismissToast(t.id)} className="text-dim hover:text-text">
+      {toasts.map((item) => (
+        <div key={item.id} className="toast-in pointer-events-auto flex items-start gap-3 rounded-lg border border-line-strong bg-raised px-4 py-3 shadow-xl">
+          <span className="mt-0.5">{icon[item.kind]}</span>
+          <p className="flex-1 whitespace-pre-line text-sm leading-snug">{item.message}</p>
+          <button aria-label={t("Schließen")} onClick={() => dismissToast(item.id)} className="text-dim hover:text-text">
             <X size={15} />
           </button>
         </div>
@@ -310,8 +318,8 @@ export function BusyOverlay() {
   const [show, setShow] = useState(false);
   useEffect(() => {
     if (!busy) return setShow(false);
-    const t = setTimeout(() => setShow(true), 150);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setShow(true), 150);
+    return () => clearTimeout(timer);
   }, [busy]);
   if (!busy || !show) return null;
   return (
@@ -330,8 +338,8 @@ export function DropOverlay({ active }: { active: boolean }) {
     <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-bg/80 p-10">
       <div className="flex h-full w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-accent/70 bg-accent-soft">
         <Upload size={44} className="text-accent" />
-        <p className="mt-4 font-display text-3xl font-semibold tracking-wide">Zum Installieren loslassen</p>
-        <p className="mt-2 text-sm text-muted">ZIP, 7z, RAR, PAK/UTOC/UCAS, DLL oder Ordner</p>
+        <p className="mt-4 font-display text-3xl font-semibold tracking-wide">{t("Zum Installieren loslassen")}</p>
+        <p className="mt-2 text-sm text-muted">{t("ZIP, 7z, RAR, PAK/UTOC/UCAS, DLL oder Ordner")}</p>
       </div>
     </div>
   );

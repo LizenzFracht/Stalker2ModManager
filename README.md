@@ -1,113 +1,161 @@
+<div align="center">
+
+<img src="src-tauri/icons/128x128@2x.png" width="96" alt="S2MM logo">
+
 # S2MM – Stalker 2 Mod Manager
 
-Mod-Manager für **S.T.A.L.K.E.R. 2: Heart of Chornobyl** – inspiriert vom
-[Definitive Mod Manager](https://www.nexusmods.com/crimsondesert/mods/633) und
-[CDUMM](https://github.com/faisalkindi/CrimsonDesert-UltimateModsManager) für Crimson Desert.
+**Install, sort and conflict-check mods for S.T.A.L.K.E.R. 2: Heart of Chornobyl – and follow yourself on a live map.**
 
-Tauri 2 (Rust) + React + Tailwind. Eine einzelne EXE ohne Laufzeit-Abhängigkeiten.
+[![CI](https://github.com/LizenzFracht/Stalker2ModManager/actions/workflows/ci.yml/badge.svg)](https://github.com/LizenzFracht/Stalker2ModManager/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/LizenzFracht/Stalker2ModManager?include_prereleases&label=download)](https://github.com/LizenzFracht/Stalker2ModManager/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-e0a526)](LICENSE)
+![Windows | Linux](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-4a4b42)
+![English | Deutsch](https://img.shields.io/badge/language-English%20%7C%20Deutsch-4a4b42)
 
-## Funktionen
+<img src="docs/media/01-mods.png" width="900" alt="S2MM mod list with details panel">
 
-- **Alle gängigen Mod-Arten**: Pak-Mods (`.pak` sowie IoStore `.utoc`/`.ucas`), UE4SS-Lua-Mods,
-  DLL/ASI-Plugins (z. B. UE4SS selbst) und Dateiersetzungen im Spielordner.
-- **Installation per Drag & Drop**: ZIP, 7z, RAR, lose Pak-Dateien oder Ordner. Verschachtelte
-  Archivstrukturen werden automatisch erkannt (`Stalker2/Content/Paks/~mods/…`, `Binaries/Win64`,
-  `ue4ss/Mods`, einzelne Wrapper-Ordner …).
-- **Mod-Optionen**:
-  - **FOMOD**-Installer (Schritte, Gruppen, Beschreibungen, Vorschaubilder, Flag-Bedingungen).
-  - Erkennung von **Varianten-Ordnern** (z. B. `x2/`, `x5/`) in Archiven ohne FOMOD – wählbar wie FOMOD.
-  - Auswahl jederzeit änderbar, ohne neu zu installieren.
-- **Konfigurationsdateien bearbeiten** (`.ini`, `.lua`, `.json`, `.cfg`, …) direkt im Mod.
-- **Ladereihenfolge per Drag & Drop**: Weiter unten = gewinnt. Pak-Dateien bekommen beim Anwenden ein
-  Nummern-Präfix (`003_modname_Datei_P.pak`), optional mit erzwungenem `_P`-Suffix.
-- **Konflikterkennung auf Asset-Ebene**: S2MM liest die Inhaltsverzeichnisse aller Paks (Pak v11 +
-  IoStore) und zeigt, welche Mod welche `.cfg`/Assets einer anderen überschreibt – inkl. „Umkehren“-Knopf.
-- **Sicheres Anwenden**: Mods liegen in einer eigenen Bibliothek und werden per Hardlink (oder Kopie)
-  ins Spiel gebracht. Nur von S2MM platzierte Dateien werden je entfernt; überschriebene Originaldateien
-  werden gesichert und wiederhergestellt. „Vanilla herstellen“ entfernt alles mit einem Klick.
-- **Profile**: Mehrere Mod-Zusammenstellungen mit eigener Reihenfolge. Das schreibgeschützte Profil **„Vanilla“**
-  ist immer vorhanden (keine Mods); wer dort eine Mod aktiviert, landet automatisch im eigenen Mod-Profil.
-- **Vanilla herstellen** (auch als Angebot beim ersten Start): entfernt alle S2MM-Mods und auf Wunsch manuell
-  installiertes UE4SS, fremde Mods in `~mods`/`Stalker2\Mods` sowie alle Engine.ini-Tweaks (Steam- und
-  Game-Pass-Konfiguration; die vom Spiel geschriebenen Abschnitte bleiben). Nichts wird gelöscht – alles landet in
-  einem datierten Sicherungsordner.
-- **Automatisch sortieren**: Vorschlag mit Begründung – Frameworks zuerst, große Pak-Überarbeitungen vor kleinen
-  Änderungen, Patches/Kompatibilitäts-Mods zuletzt bzw. direkt hinter ihrer Basis-Mod.
-- **Fremde Dateien** im `~mods`-Ordner werden erkannt und können übernommen werden.
-- **Spiel-Tweaks**: Engine.ini-Editor (`[SystemSettings]`) mit kuratierten Schaltern (Chromatische
-  Aberration, Vignette, Tiefenunschärfe, Streaming-Pool, Shader-Cache …), eigenen CVars und Sicherung.
-- **Nexus Mods**:
-  - Anmeldung per persönlichem API-Schlüssel – es reicht der Schlüssel, der auf der Nexus-API-Seite beim Eintrag
-    „Vortex (old)“ steht.
-  - `nxm://`-Handler für den Button **„Mod Manager Download“** → Download mit Fortschritt, automatische
-    Installation, Metadaten (Name, Version, Autor, Bild).
-  - Update-Prüfung (Datei-Update-Kette + Versionsvergleich). Premium: Update direkt herunterladen;
-    kostenlos: Nexus-Seite öffnet sich, der Download kommt per „Mod Manager Download“ zurück und ersetzt
-    die alte Version (Optionen und Reihenfolge bleiben).
-  - Nexus-IDs werden auch aus Dateinamen manuell geladener Archive erkannt (`Name-123-1-0-1732400000.zip`).
-- **Zone-Kit-Mods** (offizielles Format `Stalker2\Mods\<Name>\Content\Paks\Windows`) werden erkannt und
-  unverändert dorthin installiert – z. B. das Mod Configuration Menu.
-- **Mod-Einstellungen (MCM)**: Liest und schreibt `MCM_Settings.sav` (Unreal-SaveGame/GVAS, byte-genau über
-  [uesave](https://crates.io/crates/uesave)) – Schalter für Bool-Werte, Zahlen, Texte, Tasten. MCM selbst lässt sich
-  per Toggle aktivieren/deaktivieren. Aus dem Konfigurations-Tab einer Mod springt man direkt zu ihren MCM-Werten.
-- **Tastenbelegung**: Übersicht aller Mod-Tasten (UE4SS `RegisterKeyBind`, `Key.X`-Konfigurationen, Hotkeys in
-  ini/json/lua, MCM-Tasten) mit Erkennung doppelter Belegungen (auch gegen Standardtasten des Spiels) und
-  Neubelegung per Tastendruck – inkl. Strg/Shift/Alt bei UE4SS.
-- **UE4SS bei Bedarf**: Download der aktuellen UE4SS-Version von GitHub inklusive der Stalker-2-Konfiguration
-  (Steam bzw. Game Pass), installiert als abschaltbare Mod (Toggle).
-- **Live-Karte**: Lokaler Server (nur 127.0.0.1) mit [joric's interaktiver Karte](https://github.com/joric/stalker);
-  eine mitgelieferte UE4SS-Lua-Mod meldet die Spielerposition, die Karte zeigt sie live mit Blickrichtung und
-  „Folgen“-Modus. Ein Ebenenfilter (deutsche Namen, Markeranzahl, Suche, Alle/Keine, Grundkarte) blendet
-  Markierungsgruppen ein und aus. Kartendaten werden lokal zwischengespeichert.
-- **Engine.ini Export/Import**: Export der kompletten Datei, Import als Zusammenführung aller Abschnitte oder als
-  vollständiger Ersatz (mit Sicherung).
-- **Spielerkennung**: Steam, Game Pass/Xbox, GOG, Epic. Start über Steam oder direkt, mit Parametern.
-  Erkennt Spiel-Updates (Steam-Build) und weist darauf hin.
-- **Portabler Modus**: `portable.txt` neben die EXE legen → Daten in `S2MM-Daten\`.
+</div>
 
-## Entwicklung
+## Download
 
-Voraussetzungen: Rust (MSVC), Node.js 20+, WebView2 (unter Windows 11 vorhanden).
+| | Setup | Portable |
+| --- | --- | --- |
+| **Windows 10/11** (x64) | `S2MM_x.y.z_windows_x64_setup.exe` | `S2MM_x.y.z_windows_x64_portable.zip` – unzip and run, data stays in the folder |
+| **Linux** (x86_64) | `S2MM_x.y.z_linux_amd64_setup.deb` | `S2MM_x.y.z_linux_x86_64_portable.AppImage` – `chmod +x` and run |
+
+➜ **[Latest release](https://github.com/LizenzFracht/Stalker2ModManager/releases/latest)** · every release also lists SHA-256 checksums.
+
+> Windows may show a SmartScreen warning because the app is not code-signed. Choose *More info → Run anyway*,
+> or build it yourself from source (see below).
+
+## Features
+
+### Mods in every format
+Drop archives (**ZIP, 7z, RAR**), loose **.pak / .utoc / .ucas**, **DLL/ASI** plugins or whole folders into the window.
+S2MM recognises how the mod is packed and where it belongs:
+
+| Mod type | Goes to |
+| --- | --- |
+| Pak mods (classic) | `Stalker2/Content/Paks/~mods` – renamed with a load-order prefix and `_P` |
+| Zone Kit mods (official format) | `Stalker2/Mods/<Name>/Content/Paks/Windows` |
+| UE4SS Lua mods | `Stalker2/Binaries/Win64/ue4ss/Mods/<Name>` |
+| DLL / ASI plugins, UE4SS itself | `Stalker2/Binaries/Win64` |
+| Loose game files | the matching path inside `Stalker2/` |
+
+Mods with a **FOMOD installer** or several **variant folders** (`x2/`, `x5/` …) get an options dialog – and you can
+change your choice later without reinstalling.
+
+<img src="docs/media/02-options.png" width="760" alt="FOMOD options dialog">
+
+### Load order, conflicts and auto-sort
+Reorder mods by drag & drop – mods further down win. S2MM reads the index of **every pak and IoStore container** and shows
+exactly which `.cfg` or asset one mod overrides in another. One click on *Swap* fixes the order;
+**Auto-sort** proposes a sensible order with a reason for every move.
+
+<p>
+<img src="docs/media/reorder.gif" width="560" alt="Reordering mods by drag and drop">
+<img src="docs/media/03-conflicts.png" width="400" alt="Conflict list">
+</p>
+
+<img src="docs/media/08-autosort.png" width="760" alt="Auto-sort preview">
+
+### Safe by design
+* Mods live in their own library and are **hard-linked** (or copied) into the game – nothing is extracted into the game folder by hand.
+* Only files S2MM placed are ever removed. Game files a mod replaces are **backed up and restored**.
+* **Restore vanilla** (offered on first start) removes all mods and – if you want – a manually installed UE4SS, other mods and
+  all Engine.ini tweaks. Nothing is deleted: everything goes into a dated backup folder.
+* The built-in, read-only **Vanilla** profile plus as many own profiles as you like.
+
+<img src="docs/media/09-restore-vanilla.png" width="760" alt="Restore vanilla dialog">
+
+### Mod settings (MCM) and key bindings
+* Edit the settings of the **Mod Configuration Menu** (`MCM_Settings.sav`) without starting the game – switches, numbers, keys.
+* See **every key your mods bind** (UE4SS `RegisterKeyBind`, config files, MCM), spot **double bindings** – also against the
+  game's default keys – and rebind with a key press.
+* Edit a mod's `.ini`, `.lua` or `.json` config right inside S2MM.
+
+<p>
+<img src="docs/media/05-mod-settings.png" width="480" alt="MCM settings editor">
+<img src="docs/media/04-keybindings.png" width="480" alt="Key bindings overview">
+</p>
+
+### Live map
+S2MM starts a small local web server (only reachable from your PC) that opens
+[joric's interactive Stalker 2 map](https://github.com/joric/stalker) in your browser and shows **your in-game position and
+viewing direction live**, with a *Follow* mode and a layer filter. A tiny bundled UE4SS mod reports the position once per second.
+
+<img src="docs/media/live-map.gif" width="760" alt="Live map following the player">
+
+### Game tweaks
+Curated Engine.ini switches (chromatic aberration, vignette, film grain, depth of field, motion blur, sharpening, texture pool,
+shader cache, view distance …), your own CVars, **import/export** of whole `Engine.ini` files and a one-click restore.
+
+<img src="docs/media/06-game-tweaks.png" width="760" alt="Game tweaks">
+
+### More
+* **UE4SS on demand** – downloads the current release from GitHub including the Stalker 2 config (Steam or Game Pass) and
+  installs it as a mod you can toggle.
+* Detects **Steam, Game Pass/Xbox, GOG and Epic** installs; warns after a game update.
+* **English and German** UI, following your system language (switchable in the settings).
+* **Portable mode**: put an empty `portable.txt` next to the program and all data stays in `S2MM-Data/`.
+
+## Linux
+
+S2MM runs natively on Linux and manages a Steam/Proton install of Stalker 2. The game's config, MCM settings and the live
+map data are found inside the Proton prefix
+(`steamapps/compatdata/1643320/pfx/drive_c/users/steamuser/AppData/Local`). UE4SS works under Proton when you add
+`WINEDLLOVERRIDES="dwmapi=n,b" %command%` to the game's launch options in Steam.
+
+## Nexus Mods integration
+
+S2MM contains a full Nexus Mods integration (“Mod Manager Download” links, update checks, direct downloads for Premium
+users). Public builds ship with it **switched off** until S2MM is registered as an application with Nexus Mods, as their
+[API policy](https://help.nexusmods.com/article/114-api-acceptable-use-policy) requires. Until then: download mods in your
+browser and drop the archive into S2MM – the Nexus mod ID and version are read from the file name.
+
+## Building from source
+
+Requirements: [Rust](https://rustup.rs/) (stable), Node.js 20+, and on Linux the
+[Tauri prerequisites](https://tauri.app/start/prerequisites/) (`libwebkit2gtk-4.1-dev` etc.).
 
 ```bash
 npm install
-npm run tauri dev      # App mit echtem Backend
-npm run dev            # nur UI im Browser mit Testdaten (src/devMock.ts)
-npm run tauri build    # EXE + Installer unter src-tauri/target/release
-cd src-tauri && cargo test
-cargo test -- --ignored                  # zusätzlich Netzwerk-Tests (UE4SS-Download, Kartenserver)
-cargo run --example mapserver            # nur den Kartenserver starten (Port 27421)
+npm run tauri dev          # run the app
+npm run dev                # UI only, in the browser with sample data
+npm run release            # setup + portable packages into ./release
+cd src-tauri && cargo test # tests, incl. an end-to-end run against a fake game folder
 ```
 
-Die Tests enthalten einen End-to-End-Durchlauf (Installieren → Optionen → Konflikte → Anwenden →
-Backup/Restore → Vanilla) gegen einen künstlichen Spielordner sowie – falls vorhanden – einen
-Lese-Test gegen die echten Spiel-Paks.
+`cargo build --features nexus` enables the Nexus Mods integration. `node scripts/screenshots.mjs` renders the images in
+`docs/media`, `node scripts/third-party-notices.mjs` updates `THIRD_PARTY_NOTICES.md`.
 
-### Aufbau
+Releases are built by GitHub Actions when a tag `v*` is pushed (see `.github/workflows/release.yml`).
 
-| Datei | Aufgabe |
-| --- | --- |
-| `src-tauri/src/game.rs` | Installationen finden, Pfade, Spielstart |
-| `src-tauri/src/archive.rs` | ZIP/7z/RAR entpacken |
-| `src-tauri/src/layout.rs` | Archivstruktur analysieren, Varianten erkennen, Dateien Zielen zuordnen |
-| `src-tauri/src/fomod.rs` | FOMOD-`ModuleConfig.xml` |
-| `src-tauri/src/plan.rs` | Profil → Dateiliste, Pak-Benennung, Konflikte |
-| `src-tauri/src/pak.rs` | Pak-v11- und IoStore-Verzeichnisindex lesen |
-| `src-tauri/src/deploy.rs` | Anwenden/Entfernen mit Backups |
-| `src-tauri/src/tweaks.rs` | Engine.ini |
-| `src-tauri/src/nexus.rs` | Nexus-API, nxm-Links, Protokoll-Registrierung |
-| `src-tauri/src/gvas.rs` | SaveGame-Editor (MCM) |
-| `src-tauri/src/keybinds.rs` | Tasten finden und umschreiben |
-| `src-tauri/src/ue4ss.rs` | UE4SS-Download |
-| `src-tauri/src/livemap.rs`, `livemap/` | Kartenserver, Overlay-Skript, Lua-Positions-Mod |
-| `src/` | React-Oberfläche |
+### Adding a language
+Copy `src/locales/en.ts` to e.g. `src/locales/uk.ts`, translate the values (the keys are the German source texts) and
+register it in `src/i18n.ts`. Backend messages use the `tr!` macro in `src-tauri/src/i18n.rs`.
 
-Daten: `%APPDATA%\de.s2mm.stalker2modmanager\` (`state.json`, `deployment.json`, `mods\`, `downloads\`, `backups\`).
+## Credits
 
-## Ideen für v2
+S2MM stands on the shoulders of others – thank you!
 
-- Nexus-SSO-Anmeldung (erfordert eine bei Nexus registrierte App) und Mod-Browser in der App.
-- Zusammenführen kollidierender `.cfg`-Dateien zu einer Merge-Pak (benötigt Pak-Schreiber + Oodle/Zlib).
-- „Culprit finden“: automatische Halbierungssuche nach einer absturzverursachenden Mod.
-- Export/Import von Profilen (Modlisten teilen).
-- Steam Workshop / mod.io-Mods anzeigen.
+* **[joric](https://github.com/joric/stalker)** – the interactive Stalker 2 map used by the live map (Unlicense)
+* **[UE4SS (RE-UE4SS)](https://github.com/UE4SS-RE/RE-UE4SS)** – Lua scripting for Unreal Engine and the Stalker 2 game config (MIT)
+* **Mod Configuration Menu (MCM)** for Stalker 2 and its authors – S2MM edits the settings file MCM creates
+* **[uesave](https://github.com/trumank/uesave-rs)** by trumank – Unreal SaveGame reading/writing (MIT)
+* **UnRAR** by Alexander Roshal / [RARLAB](https://www.rarlab.com/) – RAR extraction (UnRAR license)
+* **[Tauri](https://tauri.app/)**, React, Tailwind CSS, dnd-kit, Lucide icons, the fonts **Barlow Condensed** and
+  **IBM Plex Mono** (SIL Open Font License) and many Rust crates – see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+* Inspired by the Crimson Desert mod managers **Definitive Mod Manager** and
+  **[CDUMM](https://github.com/faisalkindi/CrimsonDesert-UltimateModsManager)**
+
+S2MM was built with the help of AI (Claude by Anthropic).
+
+## License and disclaimer
+
+S2MM is released under the [MIT License](LICENSE). Third-party components keep their own licenses, listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and in the app under *Settings → About S2MM*.
+
+This is an unofficial fan project. It is not affiliated with or endorsed by GSC Game World, Nexus Mods, Valve or Microsoft.
+S.T.A.L.K.E.R. and S.T.A.L.K.E.R. 2: Heart of Chornobyl are trademarks of GSC Game World. Use mods at your own risk and keep
+backups of your saves.
