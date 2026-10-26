@@ -1,12 +1,12 @@
 <div align="center">
 
-<img src="docs/media/nexus/04-s2mm-header-1300x372-v2.png" width="1300" alt="S2MM — Stalker 2 Mod Manager, showing the application in a three-dimensional view">
+<img src="docs/media/nexus/06-s2mm-header-fresh-1300x372.png" width="1300" alt="S2MM — Stalker 2 Mod Manager, showing the application in a three-dimensional view">
 
 # S2MM — Stalker 2 Mod Manager
 
-Windows & Linux · English & German · Setup & Portable
+Windows · English & German · Setup & Portable
 
-[Downloads](https://github.com/LizenzFracht/Stalker2ModManager/releases) · [Report an issue](https://github.com/LizenzFracht/Stalker2ModManager/issues) · [MIT License](LICENSE)
+[Nexus Mods](https://www.nexusmods.com/stalker2heartofchornobyl/mods/3099) · [Downloads](https://github.com/LizenzFracht/Stalker2ModManager/releases) · [Report an issue](https://github.com/LizenzFracht/Stalker2ModManager/issues) · [MIT License](LICENSE)
 
 </div>
 
@@ -17,8 +17,6 @@ Windows & Linux · English & German · Setup & Portable
 I do not know how regularly I will keep working on it. Updates, fixes and replies may be sporadic, and development may stop altogether. There is no support schedule or commitment to keeping up with future game patches.
 
 The source is available under the MIT License. Use it, change it, fork it, improve it, or leave it alone.
-
-*Take it and do whatever you want with it. Or don't.*
 
 ## What it does
 
@@ -97,7 +95,7 @@ Open [joric's interactive map](https://github.com/joric/stalker) in your browser
 
 **Position tracking requires working UE4SS and the included S2MM Live-Map mod.** UE4SS is a separate project that S2MM can download and install on request. Game updates can break it; when UE4SS cannot start, Lua mods and live position tracking cannot work.
 
-The map server runs on your own PC. The Lua mod writes position data to `%LOCALAPPDATA%\S2MM-Live\live.json` on Windows, or the corresponding location inside the game's Proton prefix on Linux.
+The map server runs on your own PC. The Lua mod writes position data to `%LOCALAPPDATA%\S2MM-Live\live.json`.
 
 ![Live map demonstration](docs/media/live-map.gif)
 
@@ -110,9 +108,8 @@ Get the available packages from [GitHub Releases](https://github.com/LizenzFrach
 | Platform | Setup | Portable |
 | --- | --- | --- |
 | Windows 10/11, x64 | `S2MM_<version>_windows_x64_setup.exe` | `S2MM_<version>_windows_x64_portable.zip` |
-| Linux, x86-64 — experimental | `S2MM_<version>_linux_amd64_setup.deb` | `S2MM_<version>_linux_x86_64_portable.AppImage` |
 
-**Windows is the locally tested platform. Linux/Proton support has not been personally tested on a Linux system.** The release workflow builds Linux packages on GitHub Actions; availability depends on the release.
+Releases include Windows x64 setup and portable packages.
 
 1. Back up your saves and any existing manual mod setup.
 2. Start S2MM and check the detected game folder.
@@ -128,16 +125,6 @@ The Windows build is not code-signed, so Windows may show a SmartScreen warning.
 
 The built-in Nexus API integration is **disabled in public builds pending application registration**. Download mods in your browser and drop the archives into S2MM. MCM and other third-party mods are not bundled with the app.
 
-### Linux / Proton
-
-Linux support targets a Steam/Proton installation of Stalker 2. To use UE4SS under Proton, add the following to the game's Steam launch options:
-
-```text
-WINEDLLOVERRIDES="dwmapi=n,b" %command%
-```
-
-On Linux, make a downloaded AppImage executable before running it. This platform still needs testing and feedback.
-
 ## Source, feedback and contributions
 
 Bug reports and contributions are welcome. If you [report an issue](https://github.com/LizenzFracht/Stalker2ModManager/issues), include your app version, game version, platform and steps to reproduce it. Please do not include API keys or other private information.
@@ -146,7 +133,7 @@ I may not be able to investigate or reply. If you want to take the project in yo
 
 ### Building from source
 
-You need Rust, Node.js 20.11 or newer, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your platform.
+You need Rust, Node.js 20.11 or newer, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for Windows.
 
 ```sh
 npm ci
@@ -157,7 +144,7 @@ cd src-tauri
 cargo test --locked
 ```
 
-From the repository root, `npm run release` builds the local platform's setup and portable packages into `release/`. The build script remaps personal source paths out of the Rust binary. The release workflow creates a draft release when a `v*` tag is pushed.
+From the repository root on Windows, `npm run release` builds the setup and portable packages into `release/`. The build script remaps personal source paths out of the Rust binary. The release workflow can create a draft release when a `v*` tag is pushed; an already published release is left unchanged.
 
 `node scripts/ui-regression.mjs` exercises the browser preview's protection toggle, draft preservation and diagnostics using Chrome or Chromium. Set `CHROME_PATH` if it is not found automatically. These tests use example data and do not touch your installed game.
 
