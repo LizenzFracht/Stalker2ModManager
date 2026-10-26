@@ -1,0 +1,279 @@
+//! Game install detection, layout and launching.
+
+use crate::model::{LaunchMethod, Platform, Settings};
+use crate::util::hidden_command;
+use anyhow::{bail, Result};
+use serde::Serialize;
+use std::path::{Path, PathBuf};
+
+pub const STEAM_APP_ID: &str = "1643320";
+pub const STEAM_DIR: &str = "S.T.A.L.K.E.R. 2 Heart of Chornobyl";
+pub const NEXUS_DOMAIN: &str = "stalker2heartofchornobyl";
+pub const SHIPPING_EXES: [&str; 2] = ["Stalker2-Win64-Shipping.exe", "Stalker2-WinGDK-Shipping.exe"];
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectedInstall {
+    pub path: String,
+    pub platform: Platform,
+}
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GameInfo {
+    pub path: String,
+    pub platform: Platform,
+    pub valid: bool,
+    /// Game-relative folders (forward slashes).
+    pub binaries_dir: String,
+    pub mods_dir: String,
+    pub ue4ss_mods_dir: String,
+    pub ue4ss_installed: bool,
+    pub exe: Option<String>,
+    pub config_dir: Option<String>,
+    pub build: Option<String>,
+}
+
+impl GameInfo {
+    pub fn root(&self) -> PathBuf {
+        PathBuf::from(&self.path)
+    }
+    pub fn abs(&self, rel: &str) -> PathBuf {
+        crate::util::join_rel(&self.root(), rel)
+    }
+}
+
+/// Accepts the game root or its `Stalker2` subfolder and returns the root.
+pub fn normalize_root(path: &Path) -> Option<PathBuf> {
+    if path.join("Stalker2").join("Content").is_dir() {
+        return Some(path.to_path_buf());
+    }
+    if path.join("Content").join("Paks").is_dir()
+        && path.file_name().map(|n| n.eq_ignore_ascii_case("Stalker2")).unwrap_or(false)
+    {
+        return path.parent().map(|p| p.to_path_buf());
+    }
+    // Game Pass: <XboxGames>\S.T.A.L.K.E.R. 2- ...\Content\Stalker2
+    if path.join("Content").join("Stalker2").join("Content").is_dir() {
+        return Some(path.join("Content"));
+    }
+    None
+}
+
+pub fn guess_platform(root: &Path) -> Platform {
+    let s = root.to_string_lossy().to_lowercase();
+    if s.contains("steamapps") {
+        Platform::Steam
+    } else if s.contains("xboxgames") || root.join("gamelaunchhelper.exe").exists() || root.join("MicrosoftGame.config").exists() {
+        Platform::GamePass
+    } else if s.contains("gog") || root.join("goggame-1529799785.info").exists() {
+        Platform::Gog
+    } else if s.contains("epic") {
+        Platform::Epic
+    } else {
+        Platform::Unknown
+    }
+}
+
+pub fn inspect(root: &Path, settings: &Settings) -> GameInfo {
+    let valid = root.join("Stalker2").join("Content").join("Paks").is_dir();
+    let platform = match settings.platform {
+        Platform::Unknown => guess_platform(root),
+        p => p,
+    };
+    let bin_name = if root.join("Stalker2/Binaries/WinGDK").is_dir() && !root.join("Stalker2/Binaries/Win64").is_dir() {
+        "WinGDK"
+    } else {
+        "Win64"
+    };
+    let binaries_dir = format!("Stalker2/Binaries/{bin_name}");
+    let ue4ss_installed = root.join(&binaries_dir).join("ue4ss").is_dir();
+    let ue4ss_mods_dir = if ue4ss_installed || !root.join(&binaries_dir).join("Mods").is_dir() {
+        format!("{binaries_dir}/ue4ss/Mods")
+    } else {
+        format!("{binaries_dir}/Mods")
+    };
+    let exe = ["Stalker2.exe", "gamelaunchhelper.exe"]
+        .iter()
+        .map(|e| root.join(e))
+        .chain(SHIPPING_EXES.iter().map(|e| root.join(&binaries_dir).join(e)))
+        .find(|p| p.exists())
+        .map(|p| p.to_string_lossy().into_owned());
+
+    GameInfo {
+        path: root.to_string_lossy().into_owned(),
+        platform,
+        valid,
+        binaries_dir,
+        mods_dir: "Stalker2/Content/Paks/~mods".into(),
+        ue4ss_mods_dir,
+        ue4ss_installed,
+        exe,
+        config_dir: config_dir(platform, settings).map(|p| p.to_string_lossy().into_owned()),
+        build: steam_build(root),
+    }
+}
+
+/// `%LOCALAPPDATA%\Stalker2\Saved\Config\Windows` (Steam/GOG) or `...\WinGDK` (Game Pass).
+pub fn config_dir(platform: Platform, settings: &Settings) -> Option<PathBuf> {
+    if let Some(dir) = settings.config_dir.as_ref().filter(|s| !s.is_empty()) {
+        return Some(PathBuf::from(dir));
+    }
+    let base = PathBuf::from(std::env::var("LOCALAPPDATA").ok()?).join("Stalker2/Saved/Config");
+    let (first, second) = if platform == Platform::GamePass {
+        ("WinGDK", "Windows")
+    } else {
+        ("Windows", "WinGDK")
+    };
+    if base.join(first).is_dir() || !base.join(second).is_dir() {
+        Some(base.join(first))
+    } else {
+        Some(base.join(second))
+    }
+}
+
+/// Steam build id from the app manifest; used to notice game patches.
+fn steam_build(root: &Path) -> Option<String> {
+    let steamapps = root.parent()?.parent()?;
+    let manifest = std::fs::read_to_string(steamapps.join(format!("appmanifest_{STEAM_APP_ID}.acf"))).ok()?;
+    vdf_values(&manifest, "buildid").into_iter().next()
+}
+
+/// Extracts every `"key" "value"` pair for a given key from a VDF/ACF text.
+fn vdf_values(text: &str, key: &str) -> Vec<String> {
+    let needle = format!("\"{}\"", key.to_lowercase());
+    text.lines()
+        .filter_map(|line| {
+            let t = line.trim();
+            if !t.to_lowercase().starts_with(&needle) {
+                return None;
+            }
+            let rest = t[needle.len()..].trim();
+            let v = rest.trim_matches('"');
+            Some(v.replace("\\\\", "\\"))
+        })
+        .collect()
+}
+
+pub fn detect_installs() -> Vec<DetectedInstall> {
+    let mut found: Vec<DetectedInstall> = Vec::new();
+    let mut push = |p: PathBuf, platform: Platform| {
+        if let Some(root) = normalize_root(&PathBuf::from(p.to_string_lossy().replace('/', "\\"))) {
+            let s = root.to_string_lossy().into_owned();
+            if !found.iter().any(|f| f.path.eq_ignore_ascii_case(&s)) {
+                found.push(DetectedInstall { path: s, platform });
+            }
+        }
+    };
+
+    // Steam
+    for lib in steam_libraries() {
+        push(lib.join("steamapps/common").join(STEAM_DIR), Platform::Steam);
+    }
+
+    // Game Pass: <drive>:\XboxGames\S.T.A.L.K.E.R. 2...\Content
+    for letter in b'C'..=b'Z' {
+        let xbox = PathBuf::from(format!("{}:\\XboxGames", letter as char));
+        if let Ok(rd) = std::fs::read_dir(&xbox) {
+            for e in rd.flatten() {
+                let name = e.file_name().to_string_lossy().to_lowercase();
+                if name.contains("s.t.a.l.k.e.r. 2") || name.contains("stalker 2") {
+                    push(e.path().join("Content"), Platform::GamePass);
+                }
+            }
+        }
+    }
+
+    // GOG
+    #[cfg(windows)]
+    {
+        use winreg::enums::*;
+        use winreg::RegKey;
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        if let Ok(games) = hklm.open_subkey("SOFTWARE\\WOW6432Node\\GOG.com\\Games") {
+            for name in games.enum_keys().flatten() {
+                if let Ok(k) = games.open_subkey(&name) {
+                    let title: String = k.get_value("gameName").unwrap_or_default();
+                    if title.to_lowercase().contains("s.t.a.l.k.e.r. 2") {
+                        let path: String = k.get_value("path").unwrap_or_default();
+                        push(PathBuf::from(path), Platform::Gog);
+                    }
+                }
+            }
+        }
+    }
+
+    // Epic
+    if let Ok(rd) = std::fs::read_dir("C:\\ProgramData\\Epic\\EpicGamesLauncher\\Data\\Manifests") {
+        for e in rd.flatten() {
+            if let Ok(text) = std::fs::read_to_string(e.path()) {
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
+                    let title = v["DisplayName"].as_str().unwrap_or("").to_lowercase();
+                    if title.contains("s.t.a.l.k.e.r. 2") {
+                        if let Some(loc) = v["InstallLocation"].as_str() {
+                            push(PathBuf::from(loc), Platform::Epic);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    found
+}
+
+fn steam_libraries() -> Vec<PathBuf> {
+    let mut roots: Vec<PathBuf> = Vec::new();
+    #[cfg(windows)]
+    {
+        use winreg::enums::*;
+        use winreg::RegKey;
+        if let Ok(k) = RegKey::predef(HKEY_CURRENT_USER).open_subkey("Software\\Valve\\Steam") {
+            if let Ok(p) = k.get_value::<String, _>("SteamPath") {
+                roots.push(PathBuf::from(p.replace('/', "\\")));
+            }
+        }
+    }
+    roots.push(PathBuf::from("C:\\Program Files (x86)\\Steam"));
+    let mut libs = Vec::new();
+    for root in roots {
+        if let Ok(text) = std::fs::read_to_string(root.join("steamapps/libraryfolders.vdf")) {
+            libs.extend(vdf_values(&text, "path").into_iter().map(PathBuf::from));
+        }
+        libs.push(root);
+    }
+    libs.dedup();
+    libs
+}
+
+pub fn is_running() -> bool {
+    let Ok(out) = hidden_command("tasklist").args(["/FO", "CSV", "/NH"]).output() else {
+        return false;
+    };
+    let text = String::from_utf8_lossy(&out.stdout).to_lowercase();
+    SHIPPING_EXES.iter().any(|e| text.contains(&e.to_lowercase()))
+}
+
+pub fn launch(game: &GameInfo, settings: &Settings) -> Result<()> {
+    let use_steam = match settings.launch_method {
+        LaunchMethod::Steam => true,
+        LaunchMethod::Direct => false,
+        LaunchMethod::Auto => game.platform == Platform::Steam,
+    };
+    if use_steam {
+        let mut url = format!("steam://rungameid/{STEAM_APP_ID}");
+        if !settings.launch_args.trim().is_empty() {
+            url = format!("steam://run/{STEAM_APP_ID}//{}/", settings.launch_args.trim());
+        }
+        hidden_command("cmd").args(["/C", "start", "", &url]).spawn()?;
+        return Ok(());
+    }
+    let Some(exe) = &game.exe else {
+        bail!("Keine Spiel-EXE gefunden. Bitte Startmethode „Steam“ wählen oder den Spielordner prüfen.");
+    };
+    let mut cmd = std::process::Command::new(exe);
+    cmd.current_dir(Path::new(exe).parent().unwrap_or(Path::new(".")));
+    cmd.args(settings.launch_args.split_whitespace());
+    cmd.spawn()?;
+    Ok(())
+}

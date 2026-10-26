@@ -1,0 +1,369 @@
+import { useMemo, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  AlertTriangle,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  FilePlus2,
+  FolderPlus,
+  GripVertical,
+  Package,
+  RefreshCw,
+  Search,
+  Settings2,
+  Sparkles,
+} from "lucide-react";
+import { api } from "../api";
+import { useStore } from "../store";
+import { useInstall } from "../App";
+import { Badge, Button, Empty, Toggle, kindLabel } from "../components/ui";
+import type { ModView } from "../types";
+import { ModDetail } from "./ModDetail";
+
+type Filter = "all" | "enabled" | "disabled" | "updates" | "issues";
+
+const filters: { id: Filter; label: string }[] = [
+  { id: "all", label: "Alle" },
+  { id: "enabled", label: "Aktiv" },
+  { id: "disabled", label: "Inaktiv" },
+  { id: "updates", label: "Updates" },
+  { id: "issues", label: "Probleme" },
+];
+
+export function hasIssue(m: ModView) {
+  return m.needsSetup || m.plan.files === 0 || (m.enabled && m.conflicts.loses > 0);
+}
+
+export function ModThumb({ mod, size = 36 }: { mod: ModView; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (mod.pictureUrl && !failed) {
+    return (
+      <img
+        src={mod.pictureUrl}
+        alt=""
+        onError={() => setFailed(true)}
+        className="shrink-0 rounded object-cover"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <div
+      className="flex shrink-0 items-center justify-center rounded bg-raised font-display font-semibold text-dim"
+      style={{ width: size, height: size, fontSize: size * 0.42 }}
+    >
+      {mod.name.slice(0, 1).toUpperCase()}
+    </div>
+  );
+}
+
+function ModRow({ mod, selected, draggable }: { mod: ModView; selected: boolean; draggable: boolean }) {
+  const { run, setState, setSelectedMod, setOptionsFor } = useStore();
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: mod.id,
+    disabled: !draggable,
+  });
+  const style = { transform: CSS.Translate.toString(transform), transition };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={() => setSelectedMod(mod.id)}
+      className={`group flex h-[54px] cursor-default items-center gap-3 border-b border-line px-3 transition-colors ${
+        selected ? "bg-raised" : "hover:bg-hover/50"
+      } ${isDragging ? "relative z-10 bg-raised shadow-2xl ring-1 ring-accent/50" : ""} ${mod.enabled ? "" : "text-muted"}`}
+    >
+      <button
+        {...attributes}
+        {...listeners}
+        aria-label={`${mod.name} verschieben`}
+        disabled={!draggable}
+        className="cursor-grab text-dim hover:text-muted active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <GripVertical size={16} />
+      </button>
+      <span className="w-7 text-right font-mono text-xs text-dim">{String(mod.priority).padStart(2, "0")}</span>
+      <Toggle
+        checked={mod.enabled}
+        label={mod.enabled ? "Deaktivieren" : "Aktivieren"}
+        onChange={async (v) => {
+          const s = await run(() => api.setEnabled([mod.id], v));
+          if (s) setState(s);
+        }}
+      />
+      <ModThumb mod={mod} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-2">
+          <span className={`truncate font-medium ${mod.enabled ? "text-text" : ""}`}>{mod.name}</span>
+          {mod.version && <span className="shrink-0 font-mono text-[11px] text-dim">v{mod.version.replace(/^v/i, "")}</span>}
+        </div>
+        <div className="truncate text-xs text-dim">
+          {mod.author ? `von ${mod.author}` : mod.archiveName ?? "Manuell hinzugefügt"}
+          {mod.category && <span> · {mod.category}</span>}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {mod.needsSetup && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOptionsFor(mod.id);
+            }}
+          >
+            <Badge tone="accent" title="Diese Mod hat Optionen, die noch nicht bestätigt wurden">
+              <Settings2 size={11} /> Optionen
+            </Badge>
+          </button>
+        )}
+        {mod.update?.available && (
+          <Badge tone="info" title={`Neue Version ${mod.update.latestVersion ?? ""} auf Nexus`}>
+            <Sparkles size={11} /> Update
+          </Badge>
+        )}
+        {mod.plan.files === 0 && (
+          <Badge tone="danger" title="Keine Dateien gefunden, die installiert werden können">
+            <AlertTriangle size={11} /> Leer
+          </Badge>
+        )}
+        {mod.enabled && mod.conflicts.wins > 0 && (
+          <span className="flex items-center gap-0.5 font-mono text-[11px] text-ok" title={`Überschreibt ${mod.conflicts.wins} Dateien anderer Mods`}>
+            <ArrowUpCircle size={13} />
+            {mod.conflicts.wins}
+          </span>
+        )}
+        {mod.enabled && mod.conflicts.loses > 0 && (
+          <span className="flex items-center gap-0.5 font-mono text-[11px] text-danger" title={`${mod.conflicts.loses} Dateien werden von anderen Mods überschrieben`}>
+            <ArrowDownCircle size={13} />
+            {mod.conflicts.loses}
+          </span>
+        )}
+        {mod.plan.kinds.map((k) => (
+          <Badge key={k} title={kindLabel[k].title}>
+            {kindLabel[k].label}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ModsPage() {
+  const { state, run, setState, selectedMod, toast, setPage } = useStore();
+  const install = useInstall();
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const mods = state?.mods ?? [];
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return mods.filter((m) => {
+      if (q && !`${m.name} ${m.author ?? ""} ${m.category ?? ""}`.toLowerCase().includes(q)) return false;
+      switch (filter) {
+        case "enabled":
+          return m.enabled;
+        case "disabled":
+          return !m.enabled;
+        case "updates":
+          return !!m.update?.available;
+        case "issues":
+          return hasIssue(m);
+        default:
+          return true;
+      }
+    });
+  }, [mods, query, filter]);
+
+  if (!state) return null;
+  const draggable = !query && filter === "all";
+  const selected = mods.find((m) => m.id === selectedMod) ?? null;
+  const updates = mods.filter((m) => m.update?.available).length;
+  const active = mods.filter((m) => m.enabled).length;
+
+  const onDragEnd = async (e: DragEndEvent) => {
+    if (!e.over || e.active.id === e.over.id) return;
+    const ids = mods.map((m) => m.id);
+    const next = arrayMove(ids, ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id)));
+    setState({ ...state, mods: next.map((id, i) => ({ ...mods.find((m) => m.id === id)!, priority: i + 1 })) });
+    const s = await run(() => api.reorderMods(next));
+    if (s) setState(s);
+  };
+
+  const addFiles = async () => {
+    const files = await open({
+      multiple: true,
+      title: "Mods hinzufügen",
+      filters: [{ name: "Mods", extensions: ["zip", "7z", "rar", "pak", "utoc", "ucas", "dll", "asi"] }],
+    });
+    if (files) install(Array.isArray(files) ? files : [files]);
+  };
+
+  const addFolder = async () => {
+    const dir = await open({ directory: true, title: "Mod-Ordner hinzufügen" });
+    if (typeof dir === "string") install([dir]);
+  };
+
+  return (
+    <div className="flex h-full">
+      <section className="flex min-w-0 flex-1 flex-col">
+        <div className="flex flex-wrap items-center gap-2 px-5 pb-3 pt-4">
+          <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={addFiles}>
+            Mod hinzufügen
+          </Button>
+          <Button icon={<FolderPlus size={16} />} onClick={addFolder}>
+            Ordner
+          </Button>
+          {state.settings.nexusApiKey && (
+            <Button
+              icon={<RefreshCw size={15} />}
+              onClick={async () => {
+                const s = await run(() => api.checkUpdates(), { busy: "Prüfe Nexus auf Updates …" });
+                if (s) {
+                  setState(s);
+                  const n = s.mods.filter((m) => m.update?.available).length;
+                  toast(n ? "info" : "success", n ? `${n} Update(s) verfügbar` : "Alle Nexus-Mods sind aktuell.");
+                }
+              }}
+            >
+              Updates prüfen
+            </Button>
+          )}
+          <div className="relative ml-auto w-64">
+            <Search size={15} className="pointer-events-none absolute left-3 top-2.5 text-dim" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Mods durchsuchen"
+              aria-label="Mods durchsuchen"
+              className="h-9 w-full rounded-md border border-line-strong bg-bg pl-9 pr-3 text-sm placeholder:text-dim focus:border-accent focus:outline-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 px-5 pb-3">
+          {filters.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`h-7 rounded-full px-3 text-xs transition-colors ${
+                filter === f.id ? "bg-accent text-accent-ink font-semibold" : "text-muted hover:bg-hover hover:text-text"
+              }`}
+            >
+              {f.label}
+              {f.id === "updates" && updates > 0 && <span className="ml-1 font-mono">{updates}</span>}
+            </button>
+          ))}
+          <span className="ml-auto text-xs text-dim">
+            {active} von {mods.length} aktiv
+            {!draggable && mods.length > 0 && " · Sortieren nur ohne Filter"}
+          </span>
+        </div>
+
+        {state.gameUpdated && (
+          <Banner tone="info">
+            Stalker 2 wurde seit dem letzten Anwenden aktualisiert. Prüfe, ob deine Mods noch zur Spielversion passen, und klicke
+            danach auf „Anwenden“.
+          </Banner>
+        )}
+        {state.unmanaged.length > 0 && (
+          <Banner
+            tone="accent"
+            action={
+              <Button
+                size="sm"
+                onClick={async () => {
+                  const r = await run(() => api.importUnmanaged(state.unmanaged), { busy: "Übernehme Dateien …" });
+                  if (r) {
+                    setState(r.state);
+                    r.errors.forEach((e) => toast("error", e));
+                    if (r.added.length) toast("success", `${r.added.length} Mod(s) übernommen. Zum Aktivieren „Anwenden“ klicken.`);
+                  }
+                }}
+              >
+                In S2MM übernehmen
+              </Button>
+            }
+          >
+            {state.unmanaged.length} Datei(en) im ~mods-Ordner werden nicht von S2MM verwaltet (z. B. manuell installiert). Übernommene Dateien
+            kannst du hier aktivieren, sortieren und auf Konflikte prüfen.
+          </Banner>
+        )}
+        {state.conflictErrors > 0 && (
+          <Banner tone="accent" action={<Button size="sm" onClick={() => setPage("conflicts")}>Details</Button>}>
+            {state.conflictErrors} Pak-Datei(en) konnten nicht auf Konflikte geprüft werden.
+          </Banner>
+        )}
+
+        <div className="min-h-0 flex-1 overflow-y-auto border-t border-line">
+          {mods.length === 0 ? (
+            <Empty icon={<Package size={44} />} title="Noch keine Mods">
+              Ziehe Archive (ZIP, 7z, RAR), Pak-Dateien oder Ordner in dieses Fenster, oder nutze „Mod Manager Download“ auf Nexus Mods.
+            </Empty>
+          ) : visible.length === 0 ? (
+            <Empty icon={<Search size={40} />} title="Keine Treffer" />
+          ) : (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+              <SortableContext items={visible.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+                {visible.map((m) => (
+                  <ModRow key={m.id} mod={m} selected={m.id === selectedMod} draggable={draggable} />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
+          {mods.length > 1 && (
+            <p className="px-5 py-4 text-xs leading-relaxed text-dim">
+              Ladereihenfolge: Weiter unten stehende Mods werden später geladen und gewinnen bei Konflikten. Pak-Dateien erhalten
+              dafür beim Anwenden ein Nummern-Präfix.
+            </p>
+          )}
+        </div>
+      </section>
+      {selected && <ModDetail key={selected.id} mod={selected} />}
+    </div>
+  );
+}
+
+export function Banner({
+  tone,
+  children,
+  action,
+}: {
+  tone: "accent" | "info" | "danger";
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  const cls = {
+    accent: "border-accent/30 bg-accent-soft",
+    info: "border-info/30 bg-info-soft",
+    danger: "border-danger/30 bg-danger-soft",
+  }[tone];
+  return (
+    <div className={`mx-5 mb-3 flex items-center gap-3 rounded-md border px-3.5 py-2.5 text-[13px] leading-snug ${cls}`}>
+      <AlertTriangle size={16} className={tone === "info" ? "text-info" : tone === "danger" ? "text-danger" : "text-accent"} />
+      <p className="flex-1">{children}</p>
+      {action}
+    </div>
+  );
+}

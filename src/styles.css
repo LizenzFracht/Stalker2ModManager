@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #121311;
+  --color-panel: #191a16;
+  --color-raised: #20211c;
+  --color-hover: #282922;
+  --color-line: #2d2e27;
+  --color-line-strong: #3d3e35;
+  --color-text: #e9e5d8;
+  --color-muted: #a3a092;
+  --color-dim: #6f6d62;
+  --color-accent: #e0a526;
+  --color-accent-soft: #e0a5261f;
+  --color-accent-ink: #1b1404;
+  --color-ok: #8bb662;
+  --color-ok-soft: #8bb6621c;
+  --color-danger: #d9654a;
+  --color-danger-soft: #d9654a1f;
+  --color-info: #7fb0c4;
+  --color-info-soft: #7fb0c41c;
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Barlow Condensed", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+}
+
+input,
+textarea,
+select {
+  user-select: text;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.label-caps {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+}
+
+/* Faint scanline texture for the sidebar, a nod to the PDA. */
+.pda-texture {
+  background-image: repeating-linear-gradient(0deg, #ffffff05 0 1px, transparent 1px 3px);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.toast-in {
+  animation: toast-in 160ms ease-out;
+}
+
+@keyframes pulse-dot {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-in,
+  .pulse-dot {
+    animation: none;
+  }
+}

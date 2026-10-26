@@ -1,0 +1,38 @@
+[package]
+name = "stalker2mm"
+version = "0.1.0"
+description = "Stalker 2 Mod Manager"
+edition = "2021"
+
+[lib]
+name = "stalker2mm_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+anyhow = "1"
+uuid = { version = "1", features = ["v4"] }
+walkdir = "2"
+zip = "2"
+sevenz-rust2 = "0.20"
+unrar = "0.5"
+roxmltree = "0.20"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+futures-util = "0.3"
+tokio = { version = "1", features = ["fs", "io-util", "net", "macros", "sync"] }
+winreg = "0.55"
+uesave = "0.7"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
