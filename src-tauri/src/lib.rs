@@ -1,4 +1,5 @@
 mod archive;
+mod autosort;
 mod deploy;
 #[cfg(test)]
 mod e2e_tests;
@@ -16,6 +17,7 @@ mod plan;
 mod tweaks;
 mod ue4ss;
 mod util;
+mod vanilla;
 
 use anyhow::{anyhow, bail, Context, Result};
 use game::{DetectedInstall, GameInfo};
@@ -235,6 +237,9 @@ impl Core {
             Some(existing) => *existing = entry,
             None => {
                 self.db.mods.push(entry);
+                if enable {
+                    self.db.leave_vanilla();
+                }
                 let active = self.db.active_profile.clone();
                 for p in &mut self.db.profiles {
                     p.mods.push(ProfileMod { id: id.clone(), enabled: enable && p.id == active });
@@ -463,6 +468,9 @@ async fn remove_mod(core: State<'_, AppCore>, id: String) -> Res<StateView> {
 #[tauri::command]
 async fn set_enabled(core: State<'_, AppCore>, ids: Vec<String>, enabled: bool) -> Res<StateView> {
     with_core(&core, move |c| {
+        if enabled {
+            c.db.leave_vanilla();
+        }
         for pm in c.db.profile_mut().mods.iter_mut().filter(|pm| ids.contains(&pm.id)) {
             pm.enabled = enabled;
         }
@@ -540,6 +548,27 @@ async fn update_mod(core: State<'_, AppCore>, id: String, patch: ModPatch) -> Re
     .await
 }
 
+#[tauri::command]
+async fn autosort_preview(core: State<'_, AppCore>) -> Res<Vec<autosort::SortEntry>> {
+    with_core(&core, |c| {
+        let g = c.require_game()?;
+        let profile = c.db.profile().clone();
+        let mut inputs = Vec::new();
+        for (i, pm) in profile.mods.iter().enumerate() {
+            let Some(entry) = c.db.find_mod(&pm.id) else { continue };
+            let (files, info) = plan::plan_mod(&c.db, &g, &c.paths.mods, &pm.id, i + 1);
+            let assets = files
+                .iter()
+                .filter(|f| matches!(util::ext_lower(&f.logical).as_str(), "pak" | "utoc"))
+                .map(|f| c.cache.assets(&f.src).map(|a| a.len()).unwrap_or(0))
+                .sum();
+            inputs.push(autosort::SortInput { id: pm.id.clone(), name: entry.name.clone(), kinds: info.kinds.into_iter().collect(), assets });
+        }
+        Ok(autosort::sort(&inputs))
+    })
+    .await
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ApplyOutcome {
@@ -573,6 +602,49 @@ async fn purge(core: State<'_, AppCore>) -> Res<StateView> {
         Ok(c.state_view())
     })
     .await
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VanillaOutcome {
+    state: StateView,
+    report: vanilla::VanillaReport,
+}
+
+#[tauri::command]
+async fn restore_vanilla(core: State<'_, AppCore>, options: vanilla::VanillaOptions) -> Res<VanillaOutcome> {
+    with_core(&core, move |c| {
+        let g = c.require_game()?;
+        let config = vanilla::config_dirs(config_dir(c).as_deref());
+        let report = vanilla::restore(&g, &c.deployment, options, &c.paths.data.join("vanilla-sicherung"), &config)?;
+        c.deployment = Deployment::default();
+        write_json(&c.paths.deployment, &c.deployment)?;
+        c.db.active_profile = model::VANILLA_ID.into();
+        c.db.settings.first_run_done = true;
+        c.save()?;
+        Ok(VanillaOutcome { state: c.state_view(), report })
+    })
+    .await
+}
+
+#[tauri::command]
+async fn finish_first_run(core: State<'_, AppCore>) -> Res<StateView> {
+    with_core(&core, |c| {
+        c.db.settings.first_run_done = true;
+        c.save()?;
+        Ok(c.state_view())
+    })
+    .await
+}
+
+#[tauri::command]
+async fn open_folder(app: AppHandle, core: State<'_, AppCore>, path: String) -> Res<()> {
+    // Only folders inside S2MM's data directory.
+    let p = PathBuf::from(&path);
+    if !p.starts_with(&core.paths.data) || !p.is_dir() {
+        return Err("Ordner nicht erlaubt".into());
+    }
+    app.opener().open_path(path, None::<&str>).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -740,6 +812,9 @@ async fn create_profile(core: State<'_, AppCore>, name: String, copy_current: bo
 #[tauri::command]
 async fn rename_profile(core: State<'_, AppCore>, id: String, name: String) -> Res<StateView> {
     with_core(&core, move |c| {
+        if id == model::VANILLA_ID {
+            bail!("Das Vanilla-Profil kann nicht umbenannt werden");
+        }
         if let Some(p) = c.db.profiles.iter_mut().find(|p| p.id == id) {
             p.name = name.trim().to_string();
         }
@@ -752,8 +827,11 @@ async fn rename_profile(core: State<'_, AppCore>, id: String, name: String) -> R
 #[tauri::command]
 async fn delete_profile(core: State<'_, AppCore>, id: String) -> Res<StateView> {
     with_core(&core, move |c| {
-        if c.db.profiles.len() <= 1 {
-            bail!("Das letzte Profil kann nicht gelöscht werden");
+        if id == model::VANILLA_ID {
+            bail!("Das Vanilla-Profil kann nicht gelöscht werden");
+        }
+        if c.db.profiles.len() <= 2 {
+            bail!("Das letzte eigene Profil kann nicht gelöscht werden");
         }
         c.db.profiles.retain(|p| p.id != id);
         c.db.normalize();
@@ -1169,6 +1247,9 @@ async fn set_tool_enabled(core: State<'_, AppCore>, tool: String, enabled: bool)
             _ => None,
         }
         .ok_or_else(|| anyhow!("Nicht installiert"))?;
+        if enabled {
+            c.db.leave_vanilla();
+        }
         if let Some(pm) = c.db.profile_mut().mods.iter_mut().find(|m| m.id == id) {
             pm.enabled = enabled;
         }
@@ -1484,10 +1565,14 @@ pub fn run() {
             remove_mod,
             set_enabled,
             reorder_mods,
+            autosort_preview,
             set_selection,
             update_mod,
             apply,
             purge,
+            restore_vanilla,
+            finish_first_run,
+            open_folder,
             get_conflicts,
             mod_details,
             read_mod_file,

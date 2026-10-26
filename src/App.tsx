@@ -14,6 +14,7 @@ import { OptionsDialog } from "./pages/OptionsDialog";
 import { KeybindsPage } from "./pages/KeybindsPage";
 import { McmPage } from "./pages/McmPage";
 import { LiveMapPage } from "./pages/LiveMapPage";
+import { VanillaDialog } from "./components/VanillaDialog";
 
 export function useInstall() {
   const { run, setState, toast, setOptionsFor, setSelectedMod } = useStore();
@@ -37,6 +38,11 @@ export function useInstall() {
 export default function App() {
   const { state, page, optionsFor, setOptionsFor } = useStore();
   const [dragging, setDragging] = useState(false);
+  // Decided once when the state first arrives, so the dialog can show its result afterwards.
+  const [welcome, setWelcome] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (state && welcome === null) setWelcome(!state.settings.firstRunDone);
+  }, [state, welcome]);
   const install = useInstall();
 
   useEffect(() => {
@@ -91,6 +97,7 @@ export default function App() {
           {page === "settings" && <SettingsPage />}
         </main>
       </div>
+      {welcome && <VanillaDialog welcome onClose={() => setWelcome(false)} />}
       {optionsFor && <OptionsDialog key={optionsFor} modId={optionsFor} onClose={() => setOptionsFor(null)} />}
       <DropOverlay active={dragging} />
       <Toasts />

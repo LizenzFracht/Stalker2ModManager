@@ -3,7 +3,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Download, ExternalLink, FolderOpen, FolderSearch, KeyRound, LogOut, ShieldAlert } from "lucide-react";
 import { api } from "../api";
 import { useStore } from "../store";
-import { Button, Field, Input, Toggle, confirmDialog, platformLabel } from "../components/ui";
+import { Button, Field, Input, Toggle, platformLabel } from "../components/ui";
+import { VanillaDialog } from "../components/VanillaDialog";
 import type { DetectedInstall, Settings } from "../types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -36,6 +37,7 @@ export function SettingsPage() {
   const [args, setArgs] = useState(state?.settings.launchArgs ?? "");
   const [configDir, setConfigDir] = useState(state?.settings.configDir ?? "");
   const [port, setPort] = useState(String(state?.settings.mapPort ?? 27420));
+  const [vanilla, setVanilla] = useState(false);
 
   useEffect(() => {
     api.detectGames().then(setDetected).catch(() => {});
@@ -221,7 +223,9 @@ export function SettingsPage() {
                   <button className="text-accent hover:underline" onClick={() => run(() => api.openUrl("https://www.nexusmods.com/users/myaccount?tab=api%20access"))}>
                     Nexus → Konto → API-Zugriff <ExternalLink size={11} className="inline" />
                   </button>
-                  . Der Schlüssel wird nur lokal gespeichert.
+
+                  . Es reicht der Schlüssel, der dort beim Eintrag <strong className="text-text">„Vortex (old)“</strong> angezeigt wird –
+                  einfach kopieren und hier einfügen. Der Schlüssel wird nur lokal gespeichert.
                 </>
               }
             >
@@ -276,22 +280,14 @@ export function SettingsPage() {
 
         <Section title="Zurücksetzen">
           <Row
-            label="Alle Mods aus dem Spiel entfernen"
-            desc={`Entfernt alle ${state.deployedFiles} von S2MM platzierten Dateien und stellt gesicherte Originale wieder her. Deine Mod-Bibliothek bleibt erhalten.`}
+            label="Vanilla wiederherstellen"
+            desc={`Entfernt alle ${state.deployedFiles} von S2MM platzierten Dateien, auf Wunsch auch UE4SS, Engine.ini-Tweaks und fremde Mods, und aktiviert das Profil „Vanilla“. Fremde Dateien werden gesichert, nicht gelöscht; deine Mod-Bibliothek bleibt erhalten.`}
           >
-            <Button
-              variant="danger"
-              icon={<ShieldAlert size={15} />}
-              disabled={state.deployedFiles === 0}
-              onClick={async () => {
-                if (!(await confirmDialog("Alle Mods aus dem Spielordner entfernen (Vanilla-Zustand)?", "Entfernen"))) return;
-                const next = await run(() => api.purge(), { busy: "Entferne Mods …", success: "Spiel ist wieder im Originalzustand." });
-                if (next) setState(next);
-              }}
-            >
+            <Button variant="danger" icon={<ShieldAlert size={15} />} onClick={() => setVanilla(true)}>
               Vanilla herstellen
             </Button>
           </Row>
+          {vanilla && <VanillaDialog onClose={() => setVanilla(false)} />}
         </Section>
       </div>
     </div>

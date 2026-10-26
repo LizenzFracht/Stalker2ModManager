@@ -45,6 +45,7 @@ const state = (): AppState => ({
     ue4ssModId: "d",
     livemapModId: null,
     mapPort: 27420,
+    firstRunDone: false,
   },
   game: {
     path: "C:\\Program Files (x86)\\Steam\\steamapps\\common\\S.T.A.L.K.E.R. 2 Heart of Chornobyl",
@@ -60,7 +61,7 @@ const state = (): AppState => ({
   },
   detected: [],
   mods,
-  profiles: [{ id: "default", name: "Standard" }, { id: "p2", name: "Hardcore" }],
+  profiles: [{ id: "vanilla", name: "Vanilla" }, { id: "default", name: "Standard" }, { id: "p2", name: "Hardcore" }],
   activeProfile: "default",
   pending: true,
   appliedAt: 0,
@@ -143,6 +144,16 @@ export function install() {
       case "livemap_status":
       case "livemap_start":
         return { running: cmd === "livemap_start", url: cmd === "livemap_start" ? "http://127.0.0.1:27420/" : null, position: { ok: true, age: 1, x: 402400, y: 578997, z: 1200, yaw: 37 } };
+      case "autosort_preview":
+        return [
+          { id: "d", from: 3, to: 0, reason: "Skript-/DLL-Mod ohne Pak-Konflikte" },
+          { id: "c", from: 2, to: 1, reason: "Pak-Mod · 412 Assets" },
+          { id: "a", from: 0, to: 2, reason: "Pak-Mod · 3 Assets" },
+          { id: "b", from: 1, to: 3, reason: "Patch für „Better Stamina“ – direkt danach" },
+          { id: "e", from: 4, to: 4, reason: "Pak-Mod" },
+        ];
+      case "restore_vanilla":
+        return { state: { ...state(), activeProfile: "vanilla", settings: { ...state().settings, firstRunDone: true } }, report: { removedDeployed: 6, moved: ["Stalker2/Binaries/Win64/ue4ss", "Stalker2/Binaries/Win64/dwmapi.dll"], engineIniReset: ["C:/x/Engine.ini"], quarantine: "C:/q" } };
       case "detect_games":
         return [];
       case "read_mod_file":

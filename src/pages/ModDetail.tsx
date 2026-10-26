@@ -20,7 +20,7 @@ import { api, nexusModUrl } from "../api";
 import { useStore } from "../store";
 import { Badge, Button, Field, IconButton, Input, Modal, Toggle, confirmDialog, formatBytes, formatDate, kindLabel } from "../components/ui";
 import type { ConflictReport, ModDetails, ModView } from "../types";
-import { ModThumb } from "./ModsPage";
+import { ModThumb, useToggleMods } from "./ModsPage";
 
 type Tab = "overview" | "files" | "config";
 
@@ -76,6 +76,7 @@ function Overview({ mod }: { mod: ModView }) {
   const { state, run, setState, setOptionsFor, setSelectedMod, toast } = useStore();
   const [notes, setNotes] = useState(mod.notes);
   const [editing, setEditing] = useState(false);
+  const toggleMods = useToggleMods();
   const [report, setReport] = useState<ConflictReport | null>(null);
 
   useEffect(() => {
@@ -117,14 +118,7 @@ function Overview({ mod }: { mod: ModView }) {
     <div className="space-y-5 px-5 py-4">
       <div className="flex flex-wrap items-center gap-2">
         <label className="mr-1 flex items-center gap-2 text-sm">
-          <Toggle
-            checked={mod.enabled}
-            label="Aktiv"
-            onChange={async (v) => {
-              const s = await run(() => api.setEnabled([mod.id], v));
-              if (s) setState(s);
-            }}
-          />
+          <Toggle checked={mod.enabled} label="Aktiv" onChange={(v) => toggleMods([mod.id], v)} />
           {mod.enabled ? "Aktiv" : "Inaktiv"}
         </label>
         {mod.layout.groups.length > 0 && (

@@ -82,6 +82,11 @@ fn inject(html: &str) -> String {
         "window.saveLocalData = saveLocalData;\nwindow.__s2mmMap = () => map;\nwindow.__s2mmGroup = () => groupLayer;",
         1,
     );
+    if let (Some(a), Some(b)) = (out.find("<title>"), out.find("</title>")) {
+        if a < b {
+            out.replace_range(a + 7..b, "S2MM Live-Karte – Stalker 2");
+        }
+    }
     let tag = "<script src=\"/s2mm/overlay.js\"></script>";
     match out.rfind("</body>") {
         Some(i) => out.insert_str(i, tag),
@@ -212,9 +217,10 @@ mod tests {
 
     #[test]
     fn injects_overlay_and_map_hook() {
-        let html = "<script type=\"module\">let map = null;\nwindow.saveLocalData = saveLocalData;\n</script></body></html>";
+        let html = "<title>Joric's Stalker</title><script type=\"module\">let map = null;\nwindow.saveLocalData = saveLocalData;\n</script></body></html>";
         let out = inject(html);
         assert!(out.contains("window.__s2mmMap = () => map;"));
         assert!(out.contains("<script src=\"/s2mm/overlay.js\"></script></body>"));
+        assert!(out.contains("<title>S2MM Live-Karte – Stalker 2</title>"));
     }
 }

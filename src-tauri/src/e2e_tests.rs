@@ -131,7 +131,7 @@ fn full_cycle() {
     let mut db = Db { settings: Settings { game_path: Some(game_root.to_string_lossy().into()), platform: Platform::Steam, ..Settings::default() }, ..Db::default() };
     for p in [&a, &b, &c, &d] {
         let e = stage(&mods_root, p, InstallMeta::default(), None).unwrap();
-        db.profiles[0].mods.push(ProfileMod { id: e.id.clone(), enabled: true });
+        db.profile_mut().mods.push(ProfileMod { id: e.id.clone(), enabled: true });
         db.mods.push(e);
     }
     let (ma, mb, mc) = (db.mods[0].clone(), db.mods[1].clone(), db.mods[2].clone());
@@ -186,7 +186,7 @@ fn full_cycle() {
     let gid = mc.layout.groups[0].id.clone();
     let min = mc.layout.groups[0].options[0].id.clone();
     db.find_mod_mut(&mc.id).unwrap().selection.insert(gid, vec![min]);
-    db.profiles[0].mods[3].enabled = false;
+    db.profile_mut().mods[3].enabled = false;
     let p2 = plan::build(&db, &g, &mods_root);
     assert!(p2.files.iter().any(|f| f.target.contains("Extra_P")));
     let r3 = deploy::apply(&g, &p2, &dep, &backups, true).unwrap();
@@ -219,7 +219,7 @@ fn stages_real_mcm_archive() {
     let e = stage(&mods_root, archive, InstallMeta::default(), None).unwrap();
     assert!(e.layout.groups.is_empty(), "{:?}", e.layout.groups);
     let mut db = Db::default();
-    db.profiles[0].mods.push(ProfileMod { id: e.id.clone(), enabled: true });
+    db.profile_mut().mods.push(ProfileMod { id: e.id.clone(), enabled: true });
     db.mods.push(e);
     let g = game::inspect(&tmp.join("game"), &Settings::default());
     let p = plan::build(&db, &g, &mods_root);
@@ -242,7 +242,7 @@ fn ue4ss_download_and_plan() {
     let mods_root = tmp.join("mods");
     let e = stage(&mods_root, &prepared.folder, InstallMeta::default(), None).unwrap();
     let mut db = Db::default();
-    db.profiles[0].mods.push(ProfileMod { id: e.id.clone(), enabled: true });
+    db.profile_mut().mods.push(ProfileMod { id: e.id.clone(), enabled: true });
     db.mods.push(e);
     let g = game::inspect(&tmp.join("game"), &Settings::default());
     let p = plan::build(&db, &g, &mods_root);

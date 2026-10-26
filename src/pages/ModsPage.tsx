@@ -29,6 +29,7 @@ import {
   Search,
   Settings2,
   Sparkles,
+  Wand2,
 } from "lucide-react";
 import { api } from "../api";
 import { useStore } from "../store";
@@ -36,6 +37,7 @@ import { useInstall } from "../App";
 import { Badge, Button, Empty, Toggle, kindLabel } from "../components/ui";
 import type { ModView } from "../types";
 import { ModDetail } from "./ModDetail";
+import { AutosortDialog } from "./AutosortDialog";
 
 type Filter = "all" | "enabled" | "disabled" | "updates" | "issues";
 
@@ -74,8 +76,23 @@ export function ModThumb({ mod, size = 36 }: { mod: ModView; size?: number }) {
   );
 }
 
+export function useToggleMods() {
+  const { state, run, setState, toast } = useStore();
+  return async (ids: string[], enabled: boolean) => {
+    const before = state?.activeProfile;
+    const s = await run(() => api.setEnabled(ids, enabled));
+    if (!s) return;
+    setState(s);
+    if (before === "vanilla" && s.activeProfile !== before) {
+      const name = s.profiles.find((p) => p.id === s.activeProfile)?.name;
+      toast("info", `Das Vanilla-Profil bleibt ohne Mods – zu Profil „${name}“ gewechselt.`);
+    }
+  };
+}
+
 function ModRow({ mod, selected, draggable }: { mod: ModView; selected: boolean; draggable: boolean }) {
-  const { run, setState, setSelectedMod, setOptionsFor } = useStore();
+  const { setSelectedMod, setOptionsFor } = useStore();
+  const toggleMods = useToggleMods();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: mod.id,
     disabled: !draggable,
@@ -105,10 +122,7 @@ function ModRow({ mod, selected, draggable }: { mod: ModView; selected: boolean;
       <Toggle
         checked={mod.enabled}
         label={mod.enabled ? "Deaktivieren" : "Aktivieren"}
-        onChange={async (v) => {
-          const s = await run(() => api.setEnabled([mod.id], v));
-          if (s) setState(s);
-        }}
+        onChange={(v) => toggleMods([mod.id], v)}
       />
       <ModThumb mod={mod} />
       <div className="min-w-0 flex-1">
@@ -171,6 +185,7 @@ export function ModsPage() {
   const install = useInstall();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [sorting, setSorting] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -250,6 +265,9 @@ export function ModsPage() {
               Updates prüfen
             </Button>
           )}
+          <Button icon={<Wand2 size={15} />} onClick={() => setSorting(true)} disabled={mods.length < 2}>
+            Automatisch sortieren
+          </Button>
           <div className="relative ml-auto w-64">
             <Search size={15} className="pointer-events-none absolute left-3 top-2.5 text-dim" />
             <input
@@ -281,6 +299,27 @@ export function ModsPage() {
           </span>
         </div>
 
+        {state.activeProfile === "vanilla" && (
+          <Banner
+            tone="info"
+            action={
+              <Button
+                size="sm"
+                onClick={async () => {
+                  const target = state.profiles.find((p) => p.id !== "vanilla");
+                  if (!target) return;
+                  const s = await run(() => api.switchProfile(target.id));
+                  if (s) setState(s);
+                }}
+              >
+                Zu „{state.profiles.find((p) => p.id !== "vanilla")?.name}“ wechseln
+              </Button>
+            }
+          >
+            Profil „Vanilla“ ist aktiv: Das Spiel läuft ohne Mods. Dieses Profil ist schreibgeschützt – wenn du eine Mod aktivierst,
+            wechselt S2MM automatisch in dein Mod-Profil.
+          </Banner>
+        )}
         {state.gameUpdated && (
           <Banner tone="info">
             Stalker 2 wurde seit dem letzten Anwenden aktualisiert. Prüfe, ob deine Mods noch zur Spielversion passen, und klicke
@@ -341,6 +380,7 @@ export function ModsPage() {
         </div>
       </section>
       {selected && <ModDetail key={selected.id} mod={selected} />}
+      {sorting && <AutosortDialog onClose={() => setSorting(false)} />}
     </div>
   );
 }

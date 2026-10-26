@@ -55,6 +55,8 @@ pub struct Settings {
     pub livemap_mod_id: Option<String>,
     #[serde(default = "default_map_port")]
     pub map_port: u16,
+    /// The welcome dialog (offering a vanilla reset) was shown.
+    pub first_run_done: bool,
 }
 
 fn default_map_port() -> u16 {
@@ -79,6 +81,7 @@ impl Default for Settings {
             ue4ss_mod_id: None,
             livemap_mod_id: None,
             map_port: default_map_port(),
+            first_run_done: false,
         }
     }
 }
@@ -224,17 +227,19 @@ pub struct Db {
     pub active_profile: String,
 }
 
+/// The built-in, read-only profile without any mods.
+pub const VANILLA_ID: &str = "vanilla";
+
 impl Default for Db {
     fn default() -> Self {
         Db {
             version: 1,
             settings: Settings::default(),
             mods: Vec::new(),
-            profiles: vec![Profile {
-                id: "default".into(),
-                name: "Standard".into(),
-                mods: Vec::new(),
-            }],
+            profiles: vec![
+                Profile { id: VANILLA_ID.into(), name: "Vanilla".into(), mods: Vec::new() },
+                Profile { id: "default".into(), name: "Standard".into(), mods: Vec::new() },
+            ],
             active_profile: "default".into(),
         }
     }
@@ -265,7 +270,24 @@ impl Db {
         self.mods.iter_mut().find(|m| m.id == id)
     }
 
-    /// Makes sure every profile references every mod exactly once.
+    pub fn vanilla_active(&self) -> bool {
+        self.active_profile == VANILLA_ID
+    }
+
+    /// Switches away from the Vanilla profile (creating "Standard" if needed).
+    pub fn leave_vanilla(&mut self) {
+        if !self.vanilla_active() {
+            return;
+        }
+        if !self.profiles.iter().any(|p| p.id != VANILLA_ID) {
+            self.profiles.push(Profile { id: "default".into(), name: "Standard".into(), mods: Vec::new() });
+            self.normalize();
+        }
+        self.active_profile = self.profiles.iter().find(|p| p.id != VANILLA_ID).unwrap().id.clone();
+    }
+
+    /// Makes sure every profile references every mod exactly once and the read-only
+    /// Vanilla profile exists (first, with everything disabled).
     pub fn normalize(&mut self) {
         if self.profiles.is_empty() {
             *self = Db {
@@ -274,6 +296,15 @@ impl Db {
                 ..Db::default()
             };
         }
+        match self.profiles.iter().position(|p| p.id == VANILLA_ID) {
+            Some(0) => {}
+            Some(i) => {
+                let v = self.profiles.remove(i);
+                self.profiles.insert(0, v);
+            }
+            None => self.profiles.insert(0, Profile { id: VANILLA_ID.into(), name: "Vanilla".into(), mods: Vec::new() }),
+        }
+        self.profiles[0].name = "Vanilla".into();
         if !self.profiles.iter().any(|p| p.id == self.active_profile) {
             self.active_profile = self.profiles[0].id.clone();
         }
@@ -286,6 +317,9 @@ impl Db {
                     p.mods.push(ProfileMod { id: id.clone(), enabled: false });
                 }
             }
+        }
+        for m in &mut self.profiles[0].mods {
+            m.enabled = false;
         }
     }
 }
@@ -311,4 +345,30 @@ pub struct Deployment {
     pub applied_at: u64,
     pub game_build: Option<String>,
     pub files: Vec<DeployedFile>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migrates_old_state_and_guards_vanilla() {
+        let mut db: Db = serde_json::from_str(
+            r#"{"profiles":[{"id":"default","name":"Standard","mods":[{"id":"a","enabled":true}]}],"activeProfile":"default","mods":[]}"#,
+        )
+        .unwrap();
+        db.mods.push(serde_json::from_value(serde_json::json!({
+            "id":"a","name":"A","version":null,"author":null,"summary":null,"installedAt":0,"updatedAt":0,
+            "archiveName":null,"nexus":null,"pictureUrl":null,"layout":{"root":"","fomod":false,"base":[],"groups":[]}
+        })).unwrap());
+        db.normalize();
+        assert_eq!(db.profiles[0].id, VANILLA_ID);
+        assert!(db.profiles[0].mods.iter().all(|m| !m.enabled));
+        assert!(db.profiles[1].mods[0].enabled, "existing profile keeps its choices");
+        assert!(!db.settings.first_run_done);
+
+        db.active_profile = VANILLA_ID.into();
+        db.leave_vanilla();
+        assert_eq!(db.active_profile, "default");
+    }
 }

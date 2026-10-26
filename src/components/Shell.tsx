@@ -7,6 +7,7 @@ import {
   FolderOpen,
   Info,
   Keyboard,
+  Lock,
   Layers,
   ListChecks,
   Map as MapIcon,
@@ -166,18 +167,19 @@ function ProfileMenu() {
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${p.id === state.activeProfile ? "bg-accent" : "bg-transparent"}`} />
                 <span className="truncate">{p.name}</span>
+                {p.id === "vanilla" && <Lock size={13} className="ml-auto text-dim" aria-label="schreibgeschützt" />}
               </button>
             ))}
             <div className="my-1.5 h-px bg-line" />
             <MenuItem icon={<Plus size={15} />} onClick={() => { setOpen(false); setName(""); setDialog("new"); }}>
               Neues Profil
             </MenuItem>
-            <MenuItem icon={<Pencil size={15} />} onClick={() => { setOpen(false); setName(active?.name ?? ""); setDialog("rename"); }}>
+            <MenuItem icon={<Pencil size={15} />} disabled={state.activeProfile === "vanilla"} onClick={() => { setOpen(false); setName(active?.name ?? ""); setDialog("rename"); }}>
               Umbenennen
             </MenuItem>
             <MenuItem
               icon={<Trash2 size={15} />}
-              disabled={state.profiles.length < 2}
+              disabled={state.activeProfile === "vanilla" || state.profiles.length < 3}
               onClick={async () => {
                 setOpen(false);
                 if (!(await confirmDialog(`Profil „${active?.name}“ löschen? Die Mods selbst bleiben erhalten.`, "Löschen"))) return;

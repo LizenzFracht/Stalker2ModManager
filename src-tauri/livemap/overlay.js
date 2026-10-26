@@ -9,12 +9,14 @@
     #s2mm-live .coords{font:12px Consolas,monospace;color:#a3a092}
     #s2mm-live button{background:#282922;color:#e9e5d8;border:1px solid #3d3e35;border-radius:6px;padding:4px 9px;cursor:pointer;font:inherit}
     #s2mm-live button.active{background:#e0a526;color:#1b1404;border-color:#e0a526;font-weight:600}
-    #s2mm-layers{position:fixed;right:12px;top:56px;z-index:9999;width:250px;max-height:calc(100vh - 150px);display:flex;flex-direction:column;
+    #s2mm-layers{position:fixed;right:12px;top:92px;z-index:10001;width:250px;max-height:calc(100vh - 190px);display:flex;flex-direction:column;
       border-radius:8px;background:rgba(18,19,17,.94);color:#e9e5d8;border:1px solid #3d3e35;font:13px "Segoe UI",sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.4)}
-    #s2mm-layers header{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;user-select:none;font-weight:600}
+    #s2mm-layers header{display:flex;align-items:center;gap:8px;padding:8px 10px;user-select:none;font-weight:600}
     #s2mm-layers header span{flex:1}
+    #s2mm-layers header button{background:#282922;color:#e9e5d8;border:1px solid #3d3e35;border-radius:6px;width:26px;height:22px;cursor:pointer;line-height:1}
+    #s2mm-layers.s2mm-collapsed{width:250px}
     #s2mm-layers .body{overflow:auto;padding:0 10px 10px;border-top:1px solid #2d2e27}
-    #s2mm-layers.collapsed .body{display:none}
+    #s2mm-layers.s2mm-collapsed .body{display:none}
     #s2mm-layers h4{margin:10px 0 4px;font:600 11px "Segoe UI",sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#6f6d62}
     #s2mm-layers label{display:flex;align-items:center;gap:8px;padding:3px 2px;border-radius:4px;cursor:pointer}
     #s2mm-layers label:hover{background:#282922}
@@ -112,15 +114,33 @@
   const box = document.createElement("div");
   box.id = "s2mm-layers";
   let collapsed = localStorage.getItem("s2mm-layers-collapsed") === "1";
-  box.classList.toggle("collapsed", collapsed);
-  box.innerHTML = '<header><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0a526" stroke-width="2"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg><span>Ebenen</span><small>▾</small></header><div class="body"></div>';
+  box.innerHTML = '<header><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e0a526" stroke-width="2"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg><span>Ebenen</span><button type="button" title="Ein-/ausklappen"></button></header><div class="body"></div>';
   document.body.appendChild(box);
   const body = box.querySelector(".body");
-  box.querySelector("header").onclick = () => {
+  const toggleBtn = box.querySelector("header button");
+  const applyCollapsed = () => {
+    box.classList.toggle("s2mm-collapsed", collapsed);
+    toggleBtn.textContent = collapsed ? "▸" : "▾";
+    toggleBtn.setAttribute("aria-expanded", String(!collapsed));
+  };
+  applyCollapsed();
+  toggleBtn.onclick = () => {
     collapsed = !collapsed;
-    box.classList.toggle("collapsed", collapsed);
+    applyCollapsed();
     try { localStorage.setItem("s2mm-layers-collapsed", collapsed ? "1" : "0"); } catch (e) {}
   };
+  // Keep clicks, drags and wheel inside our panels away from the map underneath.
+  for (const el of [box, panel]) {
+    for (const ev of ["mousedown", "mouseup", "click", "dblclick", "pointerdown", "pointerup", "touchstart", "wheel", "contextmenu"]) {
+      el.addEventListener(ev, (e) => e.stopPropagation(), { passive: true });
+    }
+  }
+  // Re-attach if the page ever replaces our elements.
+  setInterval(() => {
+    for (const el of [box, panel, style]) {
+      if (!document.body.contains(el) && !document.head.contains(el)) (el === style ? document.head : document.body).appendChild(el);
+    }
+  }, 1000);
   let filter = "";
 
   function overlays() {

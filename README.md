@@ -25,12 +25,20 @@ Tauri 2 (Rust) + React + Tailwind. Eine einzelne EXE ohne Laufzeit-Abhängigkeit
 - **Sicheres Anwenden**: Mods liegen in einer eigenen Bibliothek und werden per Hardlink (oder Kopie)
   ins Spiel gebracht. Nur von S2MM platzierte Dateien werden je entfernt; überschriebene Originaldateien
   werden gesichert und wiederhergestellt. „Vanilla herstellen“ entfernt alles mit einem Klick.
-- **Profile**: Mehrere Mod-Zusammenstellungen mit eigener Reihenfolge.
+- **Profile**: Mehrere Mod-Zusammenstellungen mit eigener Reihenfolge. Das schreibgeschützte Profil **„Vanilla“**
+  ist immer vorhanden (keine Mods); wer dort eine Mod aktiviert, landet automatisch im eigenen Mod-Profil.
+- **Vanilla herstellen** (auch als Angebot beim ersten Start): entfernt alle S2MM-Mods und auf Wunsch manuell
+  installiertes UE4SS, fremde Mods in `~mods`/`Stalker2\Mods` sowie alle Engine.ini-Tweaks (Steam- und
+  Game-Pass-Konfiguration; die vom Spiel geschriebenen Abschnitte bleiben). Nichts wird gelöscht – alles landet in
+  einem datierten Sicherungsordner.
+- **Automatisch sortieren**: Vorschlag mit Begründung – Frameworks zuerst, große Pak-Überarbeitungen vor kleinen
+  Änderungen, Patches/Kompatibilitäts-Mods zuletzt bzw. direkt hinter ihrer Basis-Mod.
 - **Fremde Dateien** im `~mods`-Ordner werden erkannt und können übernommen werden.
 - **Spiel-Tweaks**: Engine.ini-Editor (`[SystemSettings]`) mit kuratierten Schaltern (Chromatische
   Aberration, Vignette, Tiefenunschärfe, Streaming-Pool, Shader-Cache …), eigenen CVars und Sicherung.
 - **Nexus Mods**:
-  - Anmeldung per persönlichem API-Schlüssel.
+  - Anmeldung per persönlichem API-Schlüssel – es reicht der Schlüssel, der auf der Nexus-API-Seite beim Eintrag
+    „Vortex (old)“ steht.
   - `nxm://`-Handler für den Button **„Mod Manager Download“** → Download mit Fortschritt, automatische
     Installation, Metadaten (Name, Version, Autor, Bild).
   - Update-Prüfung (Datei-Update-Kette + Versionsvergleich). Premium: Update direkt herunterladen;

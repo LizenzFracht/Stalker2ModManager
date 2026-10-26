@@ -19,6 +19,21 @@ export interface Settings {
   ue4ssModId: string | null;
   livemapModId: string | null;
   mapPort: number;
+  firstRunDone: boolean;
+}
+
+export interface VanillaReport {
+  removedDeployed: number;
+  moved: string[];
+  engineIniReset: string[];
+  quarantine: string | null;
+}
+
+export interface SortEntry {
+  id: string;
+  from: number;
+  to: number;
+  reason: string;
 }
 
 export interface ToolMod {
