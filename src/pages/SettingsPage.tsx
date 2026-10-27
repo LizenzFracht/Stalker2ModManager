@@ -1,11 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Download, ExternalLink, FolderOpen, FolderSearch, KeyRound, LogOut, ShieldAlert } from "lucide-react";
+import { Download, ExternalLink, FileArchive, FolderOpen, FolderSearch, KeyRound, LogOut, ShieldAlert } from "lucide-react";
 import { api } from "../api";
 import { useStore } from "../store";
 import { Button, Field, Input, Toggle, platformLabel } from "../components/ui";
 import { VanillaDialog } from "../components/VanillaDialog";
 import { AboutSection } from "../components/About";
+import { Ue4ssSignatureWarning, installCustomUe4ss } from "../components/Ue4ssSignatureWarning";
 import type { DetectedInstall, Settings } from "../types";
 import { LANGUAGES, t } from "../i18n";
 
@@ -164,6 +165,7 @@ export function SettingsPage() {
         </Section>
 
         <Section title={t("UE4SS & Werkzeuge")}>
+          <Ue4ssSignatureWarning />
           <Row
             label={t("UE4SS")}
             desc={
@@ -171,7 +173,7 @@ export function SettingsPage() {
                 ? t("Von S2MM verwaltet{v}. Ausschalten entfernt UE4SS beim nächsten „Anwenden“ wieder aus dem Spiel.", { v: state.tools.ue4ss.version ? ` · ${state.tools.ue4ss.version}` : "" })
                 : state.tools.ue4ssInGame
                   ? t("Manuell installiertes UE4SS gefunden. Über „Installieren“ übernimmt S2MM die Verwaltung (die manuelle Version wird gesichert).")
-                  : t("Lua-Scripting-Framework für Mods wie die Live-Karte. Wird bei Bedarf von GitHub geladen (inkl. Stalker-2-Konfiguration).")
+                  : t("Lua-Scripting-Framework für Mods wie die Live-Karte. Wird bei Bedarf von GitHub geladen (inkl. Stalker-2-Konfiguration) – oder installiere ein eigenes UE4SS-Paket, z. B. von Nexus Mods.")
             }
           >
             <div className="flex items-center gap-3">
@@ -184,6 +186,17 @@ export function SettingsPage() {
                 }}
               >
                 {state.tools.ue4ss.modId ? "Aktualisieren" : "Installieren"}
+              </Button>
+              <Button
+                size="sm"
+                icon={<FileArchive size={14} />}
+                title={t("Z. B. eine an Stalker 2 angepasste UE4SS-Version von Nexus Mods (zip/7z/rar).")}
+                onClick={async () => {
+                  const next = await installCustomUe4ss(run);
+                  if (next) setState(next);
+                }}
+              >
+                {t("Eigene Datei …")}
               </Button>
               {state.tools.ue4ss.modId && (
                 <Toggle

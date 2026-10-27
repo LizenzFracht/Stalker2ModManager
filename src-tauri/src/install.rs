@@ -153,11 +153,11 @@ pub fn stage(mods_root: &Path, src: &Path, meta: InstallMeta, existing: Option<&
         if old.exists() {
             std::fs::remove_dir_all(&old)?;
         }
-        std::fs::rename(&final_dir, &old).context(tr!("Alte Mod-Version verschieben (Dateien in Benutzung?)", "Moving the old mod version (files in use?)"))?;
-        std::fs::rename(&tmp, &final_dir)?;
+        crate::util::move_path(&final_dir, &old).context(tr!("Alte Mod-Version verschieben (Dateien in Benutzung?)", "Moving the old mod version (files in use?)"))?;
+        crate::util::move_path(&tmp, &final_dir)?;
         let _ = std::fs::remove_dir_all(&old);
     } else {
-        std::fs::rename(&tmp, &final_dir)?;
+        crate::util::move_path(&tmp, &final_dir)?;
     }
 
     Ok(entry)
@@ -166,6 +166,28 @@ pub fn stage(mods_root: &Path, src: &Path, meta: InstallMeta, existing: Option<&
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn update_over_read_only_files() {
+        let root = std::env::temp_dir().join(format!("s2mm-ro-{}", uuid::Uuid::new_v4().simple()));
+        let src = root.join("src/MyMod");
+        std::fs::create_dir_all(src.join("Mods/MyMod/Scripts")).unwrap();
+        let file = src.join("Mods/MyMod/Scripts/main.lua");
+        std::fs::write(&file, "print(1)").unwrap();
+        crate::tweaks::set_readonly(&file, true).unwrap();
+        let mods = root.join("mods");
+        std::fs::create_dir_all(&mods).unwrap();
+        let first = stage(&mods, &src, InstallMeta::default(), None).unwrap();
+        // A crashed earlier update can leave a stale .old folder behind.
+        std::fs::create_dir_all(mods.join(format!("{}.old/files", first.id))).unwrap();
+        let stale = mods.join(format!("{}.old/files/x.txt", first.id));
+        std::fs::write(&stale, "x").unwrap();
+        crate::tweaks::set_readonly(&stale, true).unwrap();
+        let second = stage(&mods, &src, InstallMeta::default(), Some(&first)).unwrap();
+        assert_eq!(first.id, second.id);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(!root.exists());
+    }
 
     #[test]
     fn nexus_names() {

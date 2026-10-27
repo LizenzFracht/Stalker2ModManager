@@ -130,6 +130,8 @@ struct ToolsView {
     ue4ss_in_game: bool,
     /// Result of the last game start according to UE4SS.log.
     ue4ss_log: ue4ss::LogStatus,
+    /// UE4SS's game signatures checked against the current game exe (None = no UE4SS).
+    ue4ss_signatures: Option<ue4ss::SigCheck>,
     live_map_mod: ToolMod,
     mcm: ToolMod,
 }
@@ -252,8 +254,11 @@ impl Core {
 
     fn tools(&self) -> ToolsView {
         let s = &self.db.settings;
+        let ue4ss = self.tool_mod(s.ue4ss_mod_id.as_ref(), "ue4ss");
+        let library_copy = ue4ss.mod_id.as_ref().map(|id| plan::mod_files_dir(&self.paths.mods, id));
         ToolsView {
-            ue4ss: self.tool_mod(s.ue4ss_mod_id.as_ref(), "ue4ss"),
+            ue4ss_signatures: self.game().filter(|g| g.valid).and_then(|g| ue4ss::signature_status(&g, library_copy.as_deref())),
+            ue4ss,
             ue4ss_in_game: self.game().map(|g| g.ue4ss_installed).unwrap_or(false),
             ue4ss_log: self.game().map(|g| ue4ss::log_status(&g)).unwrap_or_default(),
             live_map_mod: self.tool_mod(s.livemap_mod_id.as_ref(), "s2mm live-map"),
@@ -1297,6 +1302,50 @@ async fn ue4ss_install(core: State<'_, AppCore>) -> Res<StateView> {
     .await
 }
 
+/// Installs a UE4SS package the user picked (e.g. a Stalker-2 build from Nexus Mods) as the
+/// managed UE4SS, replacing the current one.
+#[tauri::command]
+async fn ue4ss_install_file(core: State<'_, AppCore>, path: String) -> Res<StateView> {
+    let app = core.inner().clone();
+    let existing = {
+        let c = app.lock();
+        c.tool_mod(c.db.settings.ue4ss_mod_id.as_ref(), "ue4ss").mod_id
+    };
+    let src = PathBuf::from(&path);
+    let work = app.paths.data.join("ue4ss-custom");
+    let entry = tauri::async_runtime::spawn_blocking(move || -> Result<ModEntry> {
+        // Check the package before it replaces the working UE4SS.
+        let _ = std::fs::remove_dir_all(&work);
+        let folder = work.join(src.file_stem().unwrap_or_default());
+        archive::unpack(&src, &folder)?;
+        let has_ue4ss = walkdir::WalkDir::new(&folder).into_iter().flatten().any(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case("UE4SS.dll"));
+        if !has_ue4ss {
+            let _ = std::fs::remove_dir_all(&work);
+            bail!(tr!("Das Paket enthält keine UE4SS.dll – ist das wirklich UE4SS?", "The package contains no UE4SS.dll – is this really UE4SS?"));
+        }
+        let meta = InstallMeta {
+            name: Some("UE4SS".into()),
+            summary: Some(tr!("Eigenes UE4SS-Paket ({}).", "Custom UE4SS package ({}).", src.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default())),
+            ..Default::default()
+        };
+        let entry = install_one(&app, &folder, meta, existing, true);
+        let _ = std::fs::remove_dir_all(&work);
+        entry
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| format!("{e:#}"))?;
+    with_core(&core, move |c| {
+        c.db.settings.ue4ss_mod_id = Some(entry.id.clone());
+        if let Some(pm) = c.db.profile_mut().mods.iter_mut().find(|m| m.id == entry.id) {
+            pm.enabled = true;
+        }
+        c.save()?;
+        Ok(c.state_view())
+    })
+    .await
+}
+
 #[tauri::command]
 async fn set_tool_enabled(core: State<'_, AppCore>, tool: String, enabled: bool) -> Res<StateView> {
     with_core(&core, move |c| {
@@ -1667,6 +1716,7 @@ pub fn run() {
             export_engine_ini,
             import_engine_ini,
             ue4ss_install,
+            ue4ss_install_file,
             set_tool_enabled,
             livemap_install_mod,
             livemap_start,

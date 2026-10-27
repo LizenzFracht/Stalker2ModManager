@@ -5,6 +5,7 @@ import { useStore } from "../store";
 import { Button, Toggle } from "../components/ui";
 import type { LiveStatus } from "../types";
 import { t } from "../i18n";
+import { Ue4ssSignatureWarning } from "../components/Ue4ssSignatureWarning";
 
 function Step({ done, title, children, action }: { done: boolean; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
@@ -61,6 +62,7 @@ export function LiveMapPage() {
           {t(". S2MM startet dafür einen lokalen Server (nur auf diesem PC erreichbar), der die Karte im Browser öffnet. Eine kleine UE4SS-Mod meldet die Position einmal pro Sekunde.")}
         </p>
 
+        <Ue4ssSignatureWarning className="mt-6" />
         {ue4ssFailed && (
           <div role="alert" className="mt-5 rounded-lg border border-danger/40 bg-danger-soft px-4 py-3">
             <div className="flex items-center gap-2 text-sm font-medium text-danger">

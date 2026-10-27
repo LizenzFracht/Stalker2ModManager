@@ -1,6 +1,6 @@
 [package]
 name = "stalker2mm"
-version = "0.1.1"
+version = "0.1.2"
 description = "Stalker 2 Mod Manager"
 license = "MIT"
 repository = "https://github.com/LizenzFracht/Stalker2ModManager"
@@ -29,6 +29,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 anyhow = "1"
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
+memchr = "2"
 zip = "2"
 sevenz-rust2 = "0.20"
 unrar = "0.5"

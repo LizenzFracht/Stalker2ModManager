@@ -48,8 +48,15 @@ export interface ToolsView {
   ue4ss: ToolMod;
   ue4ssInGame: boolean;
   ue4ssLog: Ue4ssLogStatus;
+  ue4ssSignatures: Ue4ssSigCheck | null;
   liveMapMod: ToolMod;
   mcm: ToolMod;
+}
+
+export interface Ue4ssSigCheck {
+  checked: number;
+  missing: string[];
+  source: "game" | "library";
 }
 
 export interface Ue4ssLogStatus {

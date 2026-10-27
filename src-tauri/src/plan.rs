@@ -67,8 +67,13 @@ pub fn plan_mod(db: &Db, game: &GameInfo, mods_root: &Path, mod_id: &str, prio: 
     for f in files {
         match classifier.classify(&f.logical) {
             Some((target, kind)) => {
-                let target = if kind == TargetKind::Pak {
-                    pak_target(game, prio, &entry.name, &target, db.settings.add_p_suffix)
+                // Zone Kit paks load from ~mods like any other pak (Stalker2/Mods is only
+                // used by Workshop/mod.io), so they get the same load-order prefix.
+                let zone_kit_pak = kind == TargetKind::ZoneKit
+                    && crate::archive::PAK_EXTS.contains(&crate::util::ext_lower(&target).as_str());
+                let target = if kind == TargetKind::Pak || zone_kit_pak {
+                    let file = target.rsplit('/').next().unwrap_or(&target).to_string();
+                    pak_target(game, prio, &entry.name, &file, db.settings.add_p_suffix)
                 } else {
                     target
                 };

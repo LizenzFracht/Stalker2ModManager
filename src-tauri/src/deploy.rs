@@ -55,8 +55,7 @@ fn remove_deployed(game: &GameInfo, f: &DeployedFile) -> Result<()> {
             if let Some(parent) = target.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            std::fs::rename(&b, &target)
-                .or_else(|_| std::fs::copy(&b, &target).map(|_| ()).and_then(|_| std::fs::remove_file(&b)))
+            crate::util::move_path(&b, &target)
                 .with_context(|| tr!("Original {} wiederherstellen", "Restoring original {}", f.target))?;
             return Ok(());
         }
@@ -155,7 +154,8 @@ pub fn apply(
             if b.exists() {
                 std::fs::remove_file(&b)?;
             }
-            std::fs::rename(&target, &b).with_context(|| tr!("Original {} sichern", "Backing up original {}", p.target))?;
+            // The backup folder usually lives on another drive than the game.
+            crate::util::move_path(&target, &b).with_context(|| tr!("Original {} sichern", "Backing up original {}", p.target))?;
             backup = Some(b.to_string_lossy().into_owned());
         } else if target.exists() {
             std::fs::remove_file(&target).with_context(|| tr!("{} ersetzen", "Replacing {}", p.target))?;

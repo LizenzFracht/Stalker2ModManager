@@ -38,6 +38,7 @@ import { Badge, Button, Empty, Toggle, kindLabel } from "../components/ui";
 import type { ModView } from "../types";
 import { ModDetail } from "./ModDetail";
 import { AutosortDialog } from "./AutosortDialog";
+import { Ue4ssSignatureWarning } from "../components/Ue4ssSignatureWarning";
 import { t } from "../i18n";
 
 type Filter = "all" | "enabled" | "disabled" | "updates" | "issues";
@@ -320,6 +321,7 @@ export function ModsPage() {
             {t("Profil „Vanilla“ ist aktiv: Das Spiel läuft ohne Mods. Dieses Profil ist schreibgeschützt – wenn du eine Mod aktivierst, wechselt S2MM automatisch in dein Mod-Profil.")}
           </Banner>
         )}
+        <Ue4ssSignatureWarning className="mx-5 mb-3" />
         {state.gameUpdated && (
           <Banner tone="info">
             {t("Stalker 2 wurde seit dem letzten Anwenden aktualisiert. Prüfe, ob deine Mods noch zur Spielversion passen, und klicke danach auf „Anwenden“.")}

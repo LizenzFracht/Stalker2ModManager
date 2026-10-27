@@ -398,6 +398,15 @@ export const en: Record<string, string> = {
   "und anderen Mods, die ihre Werte als SaveGame speichern – bearbeitbar ohne das Spiel zu starten. Vor der ersten Änderung wird eine Sicherung angelegt.":
     "and other mods that store their values as a SaveGame – editable without starting the game. A backup is made before the first change.",
   "von {author}": "by {author}",
+  "UE4SS passt nicht zur aktuellen Spielversion": "UE4SS does not match the current game version",
+  "Die UE4SS-Signaturen {names} werden in der Spiel-EXE nicht gefunden (meist nach einem Spiel-Update). Das Spiel kann dann beim Start hängen oder abstürzen. Deaktiviere UE4SS, bis ein passendes Update erscheint.":
+    "The UE4SS signatures {names} are not found in the game executable (usually after a game update). The game may hang or crash on start. Disable UE4SS until a matching update is out.",
+  "UE4SS deaktivieren": "Disable UE4SS",
+  "Nach UE4SS-Update suchen": "Check for UE4SS update",
+  "UE4SS wurde aus dem Spiel entfernt. Mods, die UE4SS brauchen, sind bis zu einem Update inaktiv.": "UE4SS was removed from the game. Mods that need UE4SS stay inactive until an update.",
+  "Noch kein passendes UE4SS-Update verfügbar.": "No matching UE4SS update available yet.",
+  "UE4SS aktualisiert – zum Übernehmen „Anwenden“ klicken.": "UE4SS updated – click “Apply” to use it.",
+  "UE4SS wurde manuell installiert – „Vanilla herstellen“ in den Einstellungen entfernt es.": "UE4SS was installed manually – “Restore vanilla” in the settings removes it.",
   Umbenennen: "Rename",
   "schreibt.": ".",
   "Danach Stalker 2 (neu) starten.": "Then (re)start Stalker 2.",
@@ -471,4 +480,12 @@ export const en: Record<string, string> = {
   "„_P“-Suffix für Paks erzwingen": "Force “_P” suffix for paks",
   "„{name}“ aus S2MM entfernen? Die Dateien der Mod werden gelöscht. Klicke danach auf „Anwenden“, um sie auch aus dem Spiel zu entfernen.":
     "Remove “{name}” from S2MM? The mod's files are deleted. Click “Apply” afterwards to remove it from the game as well.",
+  "Eigenes UE4SS-Paket wählen": "Choose custom UE4SS package",
+  "UE4SS wird installiert …": "Installing UE4SS …",
+  "Eigenes UE4SS installiert – zum Übernehmen „Anwenden“ klicken.": "Custom UE4SS installed – click “Apply” to use it.",
+  "Eigenes UE4SS installieren …": "Install custom UE4SS …",
+  "Eigene Datei …": "Custom file …",
+  "Z. B. eine an Stalker 2 angepasste UE4SS-Version von Nexus Mods (zip/7z/rar).": "E.g. a UE4SS build adapted to Stalker 2 from Nexus Mods (zip/7z/rar).",
+  "Lua-Scripting-Framework für Mods wie die Live-Karte. Wird bei Bedarf von GitHub geladen (inkl. Stalker-2-Konfiguration) – oder installiere ein eigenes UE4SS-Paket, z. B. von Nexus Mods.":
+    "Lua scripting framework for mods like the live map. Downloaded from GitHub on demand (incl. Stalker 2 config) – or install your own UE4SS package, e.g. from Nexus Mods.",
 };

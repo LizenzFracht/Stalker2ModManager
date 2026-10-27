@@ -75,6 +75,7 @@ export const api = {
     invoke<{ entries: number; state: TweakState }>("import_engine_ini", { path, replace }),
 
   ue4ssInstall: () => invoke<AppState>("ue4ss_install"),
+  ue4ssInstallFile: (path: string) => invoke<AppState>("ue4ss_install_file", { path }),
   setToolEnabled: (tool: "ue4ss" | "livemap" | "mcm", enabled: boolean) => invoke<AppState>("set_tool_enabled", { tool, enabled }),
   livemapInstallMod: () => invoke<AppState>("livemap_install_mod"),
   livemapStart: (openBrowser: boolean) => invoke<LiveStatus>("livemap_start", { openBrowser }),

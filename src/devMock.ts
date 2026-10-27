@@ -111,6 +111,8 @@ const state = (): AppState => ({
     ue4ss: { modId: "ue4ss", enabled: true, version: "v3.0.1-1183" },
     ue4ssInGame: true,
     ue4ssLog,
+    // ?sig=broken shows the "UE4SS does not match the game version" warning.
+    ue4ssSignatures: { checked: 6, missing: params.get("sig") === "broken" ? ["GUObjectArray", "ProcessLocalScriptFunction"] : [], source: "game" },
     liveMapMod: { modId: "livemap", enabled: true, version: "0.1.0" },
     mcm: { modId: "mcm", enabled: true, version: "2.0" },
   },

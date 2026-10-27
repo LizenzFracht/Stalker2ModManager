@@ -226,7 +226,7 @@ fn stages_real_mcm_archive() {
     let p = plan::build(&db, &g, &mods_root);
     let targets: Vec<&str> = p.files.iter().map(|f| f.target.as_str()).collect();
     assert_eq!(p.files.len(), 6, "{targets:?}");
-    assert!(targets.iter().all(|t| t.starts_with("Stalker2/Mods/ModConfigurationMenu/Content/Paks/Windows/")), "{targets:?}");
+    assert!(targets.iter().all(|t| t.starts_with("Stalker2/Content/Paks/~mods/001_mod-configuration-me_")), "{targets:?}");
     let report = plan::conflicts(&p, &mut PakCache::default());
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     std::fs::remove_dir_all(&tmp).unwrap();

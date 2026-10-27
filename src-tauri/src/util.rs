@@ -87,6 +87,29 @@ pub fn read_json<T: DeserializeOwned + Default>(p: &Path) -> Result<T> {
 
 /// Atomic JSON write. Flush the unique temporary file before replacement and tolerate
 /// short Windows sharing locks (e.g. another process reading/scanning the old file).
+/// Moves a file or folder. Falls back to copy + delete when `rename` cannot do it, e.g.
+/// across drives (os error 17) or on file systems such as exFAT/FAT32 (os error 1).
+pub fn move_path(src: &Path, dest: &Path) -> std::io::Result<()> {
+    match std::fs::rename(src, dest) {
+        Ok(()) => Ok(()),
+        Err(rename_err) => {
+            if !src.exists() {
+                return Err(rename_err);
+            }
+            if src.is_dir() {
+                copy_dir(src, dest).map_err(|e| std::io::Error::other(format!("{e:#}")))?;
+                std::fs::remove_dir_all(src)
+            } else {
+                if dest.exists() {
+                    std::fs::remove_file(dest)?;
+                }
+                std::fs::copy(src, dest)?;
+                std::fs::remove_file(src)
+            }
+        }
+    }
+}
+
 pub fn write_json<T: Serialize>(p: &Path, value: &T) -> Result<()> {
     let bytes = serde_json::to_vec_pretty(value)?;
     write_bytes(p, &bytes)
@@ -108,6 +131,12 @@ pub fn write_bytes(p: &Path, bytes: &[u8]) -> Result<()> {
                 Ok(()) => return Ok(()),
                 Err(e) if cfg!(windows) && attempt < 5 && matches!(e.raw_os_error(), Some(5 | 32 | 33)) => {
                     std::thread::sleep(std::time::Duration::from_millis(20 << attempt));
+                }
+                // Some file systems (exFAT/FAT32, network drives) cannot replace via rename.
+                Err(e) if matches!(e.raw_os_error(), Some(1 | 17 | 50)) => {
+                    std::fs::copy(&tmp, p).with_context(|| tr!("{} schreiben", "Writing {}", p.display()))?;
+                    let _ = std::fs::remove_file(&tmp);
+                    return Ok(());
                 }
                 Err(e) => return Err(e).with_context(|| tr!("{} schreiben", "Writing {}", p.display())),
             }
@@ -214,5 +243,36 @@ mod tests {
         assert_eq!(stored["generation"], 2);
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1, "temporary files must be cleaned up");
         std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod move_tests {
+    use super::*;
+
+    /// Set S2MM_TEST_OTHER_DRIVE to a folder on a different drive (e.g. D:\tmp) to check
+    /// that backups/restores work when rename cannot cross drives (os error 17).
+    #[test]
+    fn moves_across_drives() {
+        let Some(other) = std::env::var_os("S2MM_TEST_OTHER_DRIVE").map(PathBuf::from) else { return };
+        let local = std::env::temp_dir().join(format!("s2mm-move-{}", std::process::id()));
+        let remote = other.join(format!("s2mm-move-{}", std::process::id()));
+        std::fs::create_dir_all(local.join("dir/sub")).unwrap();
+        std::fs::create_dir_all(&remote).unwrap();
+        std::fs::write(local.join("winmm.dll"), b"dll").unwrap();
+        std::fs::write(local.join("dir/sub/a.lua"), b"lua").unwrap();
+        assert_eq!(std::fs::rename(local.join("winmm.dll"), remote.join("x")).unwrap_err().raw_os_error(), Some(17));
+
+        move_path(&local.join("winmm.dll"), &remote.join("winmm.dll")).unwrap();
+        move_path(&local.join("dir"), &remote.join("dir")).unwrap();
+        assert_eq!(std::fs::read(remote.join("winmm.dll")).unwrap(), b"dll");
+        assert_eq!(std::fs::read(remote.join("dir/sub/a.lua")).unwrap(), b"lua");
+        assert!(!local.join("winmm.dll").exists() && !local.join("dir").exists());
+
+        // and back again (restore direction)
+        move_path(&remote.join("winmm.dll"), &local.join("winmm.dll")).unwrap();
+        assert!(local.join("winmm.dll").exists());
+        std::fs::remove_dir_all(&local).unwrap();
+        std::fs::remove_dir_all(&remote).unwrap();
     }
 }
